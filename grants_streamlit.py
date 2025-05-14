@@ -381,7 +381,7 @@ else:
         "what is the total award actual posted?",
         "what is the award budget posted?",
         "What is the total amount of award encumbrances approved?",
-        "What is the total award encumbrance posted for these awards?,
+        "What is the total award encumbrance posted for these awards?",
         "WWhat is the award budget posted by date for these awards?",
         "What is the task actual posted by award name?"
     ]
