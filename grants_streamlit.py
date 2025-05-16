@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import plotly.express as px  # Added for interactive visualizations
 
 # Snowflake/Cortex Configuration
-HOST = "JJHWDJH-NHB38878.snowflakecomputing.com"
+HOST = "bnkzyio-ljb86662snowflakecomputing.com"
 DATABASE = "AI"
 SCHEMA = "DWH_MART"
 # STAGE = "CORTEX_SEARCH"
