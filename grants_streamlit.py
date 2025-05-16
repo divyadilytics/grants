@@ -9,13 +9,13 @@ from typing import Any, Dict, List, Optional, Tuple
 import plotly.express as px  # Added for interactive visualizations
 
 # Snowflake/Cortex Configuration
-HOST = "bnkzyio-ljb86662snowflakecomputing.com"
+HOST = "bnkzyio-ljb86662.snowflakecomputing.com"
 DATABASE = "AI"
 SCHEMA = "DWH_MART"
 # STAGE = "CORTEX_SEARCH"
 API_ENDPOINT = "/api/v2/cortex/agent:run"
 API_TIMEOUT = 50000  # in milliseconds
-CORTEX_SEARCH_SERVICES = "AI.DWH_MART.Grants_search_services"
+CORTEX_SEARCH_SERVICES = "AI.DWH_MART.GRANTS_SEARCH_SERVICES"
 
 # Single semantic model
 SEMANTIC_MODEL = '@"AI"."DWH_MART"."GRANTS"/GRANTSyaml.yaml'
