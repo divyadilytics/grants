@@ -378,7 +378,7 @@ else:
 
     st.sidebar.subheader("Sample Questions")
     sample_questions = [
-        "what is the award budget posted?",
+        "what is the total actual award budget?",
         "What is the total actual award posted ",
         "What is the total amount of award encumbrances approved",
         "What is the task actual posted by award name?"
