@@ -381,7 +381,7 @@ else:
         "what is the total actual award budget?",
         "What is the total actual award posted ",
         "What is the total amount of award encumbrances approved",
-        "What is the task actual posted by award name?"
+        "What is the total task actual posted by award name?"
     ]
 
     # Display chat history
