@@ -378,15 +378,10 @@ else:
 
     st.sidebar.subheader("Sample Questions")
     sample_questions = [
-        "What is Eco Sustain Innovations?",
-        "What is Green Residences program?",
-        "Describe the energy savings technologies used in Green Residences.",
-        "Show total energy savings by county.",
-        "Which county has the highest kWh savings?",
-        "How many active projects are there",
-        "What is the average kWh savings",
-        "Which counties has the min and max of kWh savings",
-        "Which counties has the least and highest of kWh savings"
+        "what is the award budget posted?",
+        "What is the total actual award posted ",
+        "What is the total amount of award encumbrances approved",
+        "What is the task actual posted by award name?"
     ]
 
     # Display chat history
