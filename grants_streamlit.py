@@ -490,26 +490,40 @@ else:
                         st.warning(response_content)
                         assistant_response["content"] = response_content
 
-                else:
-                    response = snowflake_api_call(query, is_structured=False)
-                    _, search_results = process_sse_response(response, is_structured=False)
-                    if search_results:
-                        raw_result = search_results[0]
-                        summary = summarize(raw_result)
-                        if summary:
-                            response_content = f"**Here is the Answer:**\n{summary}"
-                            last_sentence = summary.split(".")[-2] if "." in summary else summary
-                            st.markdown(response_content)
-                            st.success(f" Key Insight: {last_sentence.strip()}")
-                            assistant_response["content"] = response_content
-                        else:
-                            response_content = f"**🔍 Key Information (Unsummarized):**\n{summarize_unstructured_answer(raw_result)}"
-                            st.markdown(response_content)
-                            assistant_response["content"] = response_content
-                    else:
-                        response_content = "⚠️ No relevant search results found."
-                        st.warning(response_content)
-                        assistant_response["content"] = response_content
+               else:
+    response = snowflake_api_call(query, is_structured=False)
+    _, search_results = process_sse_response(response, is_structured=False)
+
+    st.markdown("### 🧠 Unstructured Answer")
+    if search_results:
+        raw_result = search_results[0]
+        summary = summarize(raw_result)
+
+        if summary:
+            response_content = f"**Here is the Answer:**\n{summary}"
+            last_sentence = summary.split(".")[-2] if "." in summary else summary
+            st.markdown(response_content)
+            st.success(f" Key Insight: {last_sentence.strip()}")
+            assistant_response["content"] = response_content
+        else:
+            raw_summary = summarize_unstructured_answer(raw_result)
+            response_content = f"**🔍 Key Information (Unsummarized):**\n{raw_summary}"
+            st.markdown(response_content)
+            assistant_response["content"] = response_content
+    else:
+        st.warning("⚠️ No relevant unstructured search results found.")
+        response_content = "⚠️ No relevant unstructured search results found."
+        assistant_response["content"] = response_content
+
+    # Suggested questions (split into structured and unstructured)
+    st.markdown("### 💡 Suggested Questions")
+    st.markdown("**Structured Examples:**")
+    for q in sample_questions[:3]:
+        st.markdown(f"- {q}")
+
+    st.markdown("**Unstructured Examples:**")
+    for q in sample_questions[3:]:
+        st.markdown(f"- {q}")
 
                 # Add assistant response to chat history
                 st.session_state.chat_history.append(assistant_response)
