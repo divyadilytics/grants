@@ -370,7 +370,7 @@ else:
                 "- [Contact Support](https://www.snowflake.com/en/support/)"
             )
 
-    st.title("Cortex AI Assistant by DiLytics")
+    st.title("Cortex AI Assistant for Grants")
 
     # Display the fixed semantic model
     semantic_model_filename = SEMANTIC_MODEL.split("/")[-1]
