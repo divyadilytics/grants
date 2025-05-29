@@ -380,10 +380,6 @@ else:
     semantic_model_filename = SEMANTIC_MODEL.split("/")[-1]
     st.markdown(f"Semantic Model: `{semantic_model_filename}`")
 
-    # Display welcome message under the title when no queries have been made
-    if not st.session_state.messages:
-        st.markdown("💡 **Welcome! I’m the Snowflake Cortex AI Assistant, ready to assist you with grant data analysis — simply type your question to get started**")
-
     st.sidebar.subheader("Sample Questions")
     sample_questions = [
         "what is the total actual award budget?",
@@ -540,3 +536,8 @@ else:
                 st.session_state.current_results = assistant_response.get("results")
                 st.session_state.current_sql = assistant_response.get("sql")
                 st.session_state.current_summary = assistant_response.get("summary")
+
+    # Display welcome message under the title only if no queries have been made
+    # Moved here to ensure it's evaluated after query processing
+    if not st.session_state.messages:
+        st.markdown("💡 **Welcome! I’m the Snowflake Cortex AI Assistant, ready to assist you with grant data analysis — simply type your question to get started**")
