@@ -91,7 +91,7 @@ if not st.session_state.authenticated:
             conn = snowflake.connector.connect(
                 user=st.session_state.username,
                 password=st.session_state.password,
-                account="bnkzyio-ljb86662",
+                account="GBJYVCT-LSB50763",
                 host=HOST,
                 port=443,
                 warehouse="COMPUTE_WH",
