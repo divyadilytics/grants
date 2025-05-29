@@ -265,6 +265,10 @@ else:
         except Exception as e:
             st.error(f"❌ Error Processing Response: {str(e)}")
         return sql.strip(), search_results
+        
+  # Display welcome message if no queries have been made
+    if not st.session_state.messages:
+        st.markdown("💡 **Welcome! I’m the Snowflake AI Assistant, ready to assist you with grant data analysis, summaries, and answers — simply type your question to get started**")
 
     # Visualization Function
     def display_chart_tab(df: pd.DataFrame, prefix: str = "chart", query: str = ""):
