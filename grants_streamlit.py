@@ -6,14 +6,14 @@ import snowflake.connector
 import pandas as pd
 from snowflake.snowpark import Session
 from typing import Any, Dict, List, Optional, Tuple
-import plotly.express as px  # Added for interactive visualizations
+import plotly.express as px
 
 # Snowflake/Cortex Configuration
 HOST = "GBJYVCT-LSB50763.snowflakecomputing.com"
 DATABASE = "AI"
 SCHEMA = "DWH_MART"
 API_ENDPOINT = "/api/v2/cortex/agent:run"
-API_TIMEOUT = 50000  # in milliseconds
+API_TIMEOUT = 50000
 CORTEX_SEARCH_SERVICES = "AI.DWH_MART.Grants_search_services"
 
 # Single semantic model
@@ -33,17 +33,16 @@ if "authenticated" not in st.session_state:
     st.session_state.password = ""
     st.session_state.CONN = None
     st.session_state.snowpark_session = None
-    st.session_state.chat_history = []  # Initialize chat history
+    st.session_state.chat_history = []
 if "debug_mode" not in st.session_state:
     st.session_state.debug_mode = False
-# Initialize chart selection persistence
 if "chart_x_axis" not in st.session_state:
-    st.session_state.chart_x_axis = None
+    st.session_state.chart_x_axis = ""
+    st.session_state.get("chart_x_axis", "")
 if "chart_y_axis" not in st.session_state:
-    st.session_state.chart_y_axis = None
+    st.session_state.chart_y_axis = ""
 if "chart_type" not in st.session_state:
-    st.session_state.chart_type = "Bar Chart"
-# Initialize query and results persistence
+    st.session_state.chart_type = "Pie"
 if "current_query" not in st.session_state:
     st.session_state.current_query = None
 if "current_results" not in st.session_state:
@@ -53,13 +52,12 @@ if "current_sql" not in st.session_state:
 if "current_summary" not in st.session_state:
     st.session_state.current_summary = None
 if "messages" not in st.session_state:
-    st.session_state.messages = []  # Initialize messages for welcome message check
+    st.session_state.messages = []
 
 # Hide Streamlit branding and prevent chat history shading
 st.markdown("""
 <style>
 #MainMenu, header, footer {visibility: hidden;}
-/* Prevent shading of previous chat messages */
 [data-testid="stChatMessage"] {
     opacity: 1 !important;
     background-color: transparent !important;
@@ -164,8 +162,8 @@ else:
 
     def is_greeting_query(query: str):
         greeting_patterns = [
-            r'^\b(hello|hi)\b$',  # Match "hi" or "hello" exactly
-            r'^\b(hello|hi)\b\s.*$'  # Match "hi" or "hello" followed by optional text
+            r'^\b(hello|hi)\b$',
+            r'^\b(hello|hi)\b\s.*$'
         ]
         return any(re.search(pattern, query.lower()) for pattern in greeting_patterns)
 
@@ -190,7 +188,6 @@ else:
             return None
 
     def parse_sse_response(response_text: str) -> List[Dict]:
-        """Parse SSE response into a list of JSON objects."""
         events = []
         lines = response_text.strip().split("\n")
         current_event = {}
@@ -275,15 +272,10 @@ else:
             st.error(f"❌ Error Processing Response: {str(e)}")
         return sql.strip(), search_results
 
-    # Display welcome message if no queries have been made
-    if not st.session_state.messages:
-        st.markdown("💡 **Welcome! I’m the Snowflake Cortex AI Assistant, ready to assist you with grant data analysis — simply type your question to get started**")
-
     # Visualization Function
     def display_chart_tab(df: pd.DataFrame, prefix: str = "chart", query: str = ""):
-        """Allows user to select chart options and displays a chart with unique widget keys."""
         if df.empty or len(df.columns) < 2:
-            return  # Do not show anything if visualization is not possible
+            return
 
         query_lower = query.lower()
         if re.search(r'\b(county|jurisdiction)\b', query_lower):
@@ -387,6 +379,10 @@ else:
     # Display the fixed semantic model
     semantic_model_filename = SEMANTIC_MODEL.split("/")[-1]
     st.markdown(f"Semantic Model: `{semantic_model_filename}`")
+
+    # Display welcome message under the title when no queries have been made
+    if not st.session_state.messages:
+        st.markdown("💡 **Welcome! I’m the Snowflake Cortex AI Assistant, ready to assist you with grant data analysis — simply type your question to get started**")
 
     st.sidebar.subheader("Sample Questions")
     sample_questions = [
