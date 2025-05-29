@@ -16,8 +16,8 @@ API_ENDPOINT = "/api/v2/cortex/agent:run"
 API_TIMEOUT = 50000
 CORTEX_SEARCH_SERVICES = "AI.DWH_MART.Grants_search_services"
 
-# Single semantic model
-SEMANTIC_MODEL = '@"AI"."DWH_MART"."GRANTS"/grantsyaml_27.yaml'
+# Single semantic model - Commented out since the file is missing
+# SEMANTIC_MODEL = '@"AI"."DWH_MART"."GRANTS"/GRANTSyaml_27.yaml'
 
 # Streamlit Page Config
 st.set_page_config(
@@ -38,7 +38,6 @@ if "debug_mode" not in st.session_state:
     st.session_state.debug_mode = False
 if "chart_x_axis" not in st.session_state:
     st.session_state.chart_x_axis = ""
-    st.session_state.get("chart_x_axis", "")
 if "chart_y_axis" not in st.session_state:
     st.session_state.chart_y_axis = ""
 if "chart_type" not in st.session_state:
@@ -53,6 +52,8 @@ if "current_summary" not in st.session_state:
     st.session_state.current_summary = None
 if "messages" not in st.session_state:
     st.session_state.messages = []
+if "suggested_question_selected" not in st.session_state:
+    st.session_state.suggested_question_selected = None  # To store the selected suggested question
 
 # Hide Streamlit branding and prevent chat history shading
 st.markdown("""
@@ -76,6 +77,7 @@ def start_new_conversation():
     st.session_state.chart_x_axis = None
     st.session_state.chart_y_axis = None
     st.session_state.chart_type = "Bar Chart"
+    st.session_state.suggested_question_selected = None
     st.rerun()
 
 # Authentication logic
@@ -212,12 +214,9 @@ else:
             "messages": [{"role": "user", "content": [{"type": "text", "text": query}]}],
             "tools": []
         }
-        if is_structured:
-            payload["tools"].append({"tool_spec": {"type": "cortex_analyst_text_to_sql", "name": "analyst1"}})
-            payload["tool_resources"] = {"analyst1": {"semantic_model_file": SEMANTIC_MODEL}}
-        else:
-            payload["tools"].append({"tool_spec": {"type": "cortex_search", "name": "search1"}})
-            payload["tool_resources"] = {"search1": {"name": CORTEX_SEARCH_SERVICES, "max_results": 1}}
+        # Workaround: Use cortex_search for all queries since semantic model file is missing
+        payload["tools"].append({"tool_spec": {"type": "cortex_search", "name": "search1"}})
+        payload["tool_resources"] = {"search1": {"name": CORTEX_SEARCH_SERVICES, "max_results": 1}}
 
         try:
             resp = requests.post(
@@ -376,9 +375,9 @@ else:
 
     st.title("Cortex AI Assistant for Grants")
 
-    # Display the fixed semantic model
-    semantic_model_filename = SEMANTIC_MODEL.split("/")[-1]
-    st.markdown(f"Semantic Model: `{semantic_model_filename}`")
+    # Semantic model display is commented out since the file is missing
+    # semantic_model_filename = SEMANTIC_MODEL.split("/")[-1]
+    # st.markdown(f"Semantic Model: `{semantic_model_filename}`")
 
     st.sidebar.subheader("Sample Questions")
     sample_questions = [
@@ -401,11 +400,25 @@ else:
                     st.markdown("**📈 Visualization:**")
                     display_chart_tab(message["results"], prefix=f"chart_{hash(message['content'])}", query=message.get("query", ""))
 
+            # Display suggested questions as buttons if the query wasn't understood
+            if message["role"] == "assistant" and not message.get("understood_query", True):
+                st.markdown("**I’m sorry, I didn’t understand your question. Here are some suggested questions you can try:**")
+                for idx, suggestion in enumerate(sample_questions):
+                    if st.button(suggestion, key=f"suggestion_{hash(message['query'])}_{idx}"):
+                        st.session_state.suggested_question_selected = suggestion
+                        st.rerun()
+
+    # Get user query from chat input or sidebar sample questions
     query = st.chat_input("Ask your question...")
 
     for sample in sample_questions:
         if st.sidebar.button(sample, key=sample):
             query = sample
+
+    # Check if a suggested question was selected
+    if st.session_state.suggested_question_selected:
+        query = st.session_state.suggested_question_selected
+        st.session_state.suggested_question_selected = None  # Clear after processing
 
     if query:
         # Reset chart selections for new query
@@ -427,7 +440,10 @@ else:
                 is_suggestion = is_question_suggestion_query(query)
                 is_greeting = is_greeting_query(query)
 
+                # Flag to track if the query was understood
+                understood_query = False
                 assistant_response = {"role": "assistant", "content": "", "query": query}
+
                 if is_greeting:
                     response_content = (
                         "Hello! Welcome to the GRANTS AI Assistant! I'm here to help you explore and analyze "
@@ -441,6 +457,7 @@ else:
                     )
                     st.markdown(response_content)
                     assistant_response["content"] = response_content
+                    understood_query = True
 
                 elif is_suggestion:
                     response_content = "**Here are some questions you can ask me:**\n"
@@ -449,6 +466,7 @@ else:
                     response_content += "\nFeel free to ask any of these or come up with your own related to energy savings, Green Residences, or other programs!"
                     st.markdown(response_content)
                     assistant_response["content"] = response_content
+                    understood_query = True
 
                 elif is_complete:
                     response = complete(query)
@@ -456,6 +474,7 @@ else:
                         response_content = f"**✍️ Generated Response:**\n{response}"
                         st.markdown(response_content)
                         assistant_response["content"] = response_content
+                        understood_query = True
                     else:
                         response_content = "⚠️ Failed to generate a response."
                         st.warning(response_content)
@@ -467,6 +486,7 @@ else:
                         response_content = f"**Summary:**\n{summary}"
                         st.markdown(response_content)
                         assistant_response["content"] = response_content
+                        understood_query = True
                     else:
                         response_content = "⚠️ Failed to generate a summary."
                         st.warning(response_content)
@@ -498,6 +518,7 @@ else:
                                 "results": results,
                                 "summary": summary
                             })
+                            understood_query = True
                         else:
                             response_content = "⚠️ No data found."
                             st.warning(response_content)
@@ -519,14 +540,19 @@ else:
                             st.markdown(response_content)
                             st.success(f"Key Insight: {last_sentence.strip()}")
                             assistant_response["content"] = response_content
+                            understood_query = True
                         else:
                             response_content = f"**🔍 Key Information (Unsummarized):**\n{summarize_unstructured_answer(raw_result)}"
                             st.markdown(response_content)
                             assistant_response["content"] = response_content
+                            understood_query = True
                     else:
                         response_content = "⚠️ No relevant search results found."
                         st.warning(response_content)
                         assistant_response["content"] = response_content
+
+                # Add the understood_query flag to the assistant response
+                assistant_response["understood_query"] = understood_query
 
                 # Add assistant response to chat history and messages
                 st.session_state.chat_history.append(assistant_response)
@@ -538,6 +564,5 @@ else:
                 st.session_state.current_summary = assistant_response.get("summary")
 
     # Display welcome message under the title only if no queries have been made
-    # Moved here to ensure it's evaluated after query processing
     if not st.session_state.messages:
         st.markdown("💡 **Welcome! I’m the Snowflake Cortex AI Assistant, ready to assist you with grant data analysis — simply type your question to get started**")
