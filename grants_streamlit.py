@@ -12,7 +12,6 @@ import plotly.express as px  # Added for interactive visualizations
 HOST = "GBJYVCT-LSB50763.snowflakecomputing.com"
 DATABASE = "AI"
 SCHEMA = "DWH_MART"
-# STAGE = "CORTEX_SEARCH"
 API_ENDPOINT = "/api/v2/cortex/agent:run"
 API_TIMEOUT = 50000  # in milliseconds
 CORTEX_SEARCH_SERVICES = "AI.DWH_MART.Grants_search_services"
@@ -22,7 +21,7 @@ SEMANTIC_MODEL = '@"AI"."DWH_MART"."GRANTS"/GRANTSyaml_27.yaml'
 
 # Streamlit Page Config
 st.set_page_config(
-    page_title="Welcome to Cortex AI Assistant ",
+    page_title="Welcome to Cortex AI Assistant",
     layout="wide",
     initial_sidebar_state="auto"
 )
@@ -53,6 +52,8 @@ if "current_sql" not in st.session_state:
     st.session_state.current_sql = None
 if "current_summary" not in st.session_state:
     st.session_state.current_summary = None
+if "messages" not in st.session_state:
+    st.session_state.messages = []  # Initialize messages for welcome message check
 
 # Hide Streamlit branding and prevent chat history shading
 st.markdown("""
@@ -69,6 +70,7 @@ st.markdown("""
 # Function to start a new conversation
 def start_new_conversation():
     st.session_state.chat_history = []
+    st.session_state.messages = []
     st.session_state.current_query = None
     st.session_state.current_results = None
     st.session_state.current_sql = None
@@ -141,7 +143,7 @@ else:
     def is_structured_query(query: str):
         structured_patterns = [
             r'\b(county|number|where|group by|order by|completed units|sum|count|avg|max|min|least|highest|which)\b',
-            r'\b(total|how many|leads |profit|projects|jurisdiction|month|year|energy savings|kwh)\b'
+            r'\b(total|how many|leads|profit|projects|jurisdiction|month|year|energy savings|kwh)\b'
         ]
         return any(re.search(pattern, query.lower()) for pattern in structured_patterns)
 
@@ -159,6 +161,13 @@ else:
             r'\b(give me|show me|list)\b.*\b(questions|examples|sample questions)\b'
         ]
         return any(re.search(pattern, query.lower()) for pattern in suggestion_patterns)
+
+    def is_greeting_query(query: str):
+        greeting_patterns = [
+            r'^\b(hello|hi)\b$',  # Match "hi" or "hello" exactly
+            r'^\b(hello|hi)\b\s.*$'  # Match "hi" or "hello" followed by optional text
+        ]
+        return any(re.search(pattern, query.lower()) for pattern in greeting_patterns)
 
     def complete(prompt, model="mistral-large"):
         try:
@@ -190,12 +199,12 @@ else:
                 current_event["event"] = line.split(":", 1)[1].strip()
             elif line.startswith("data:"):
                 data_str = line.split(":", 1)[1].strip()
-                if data_str != "[DONE]":  # Skip the [DONE] marker
+                if data_str != "[DONE]":
                     try:
                         data_json = json.loads(data_str)
                         current_event["data"] = data_json
                         events.append(current_event)
-                        current_event = {}  # Reset for next event
+                        current_event = {}
                     except json.JSONDecodeError as e:
                         st.error(f"❌ Failed to parse SSE data: {str(e)} - Data: {data_str}")
         return events
@@ -223,7 +232,7 @@ else:
                 },
                 timeout=API_TIMEOUT // 1000
             )
-            if st.session_state.debug_mode:  # Show debug info only if toggle is enabled
+            if st.session_state.debug_mode:
                 st.write(f"API Response Status: {resp.status_code}")
                 st.write(f"API Raw Response: {resp.text}")
             if resp.status_code < 400:
@@ -265,10 +274,10 @@ else:
         except Exception as e:
             st.error(f"❌ Error Processing Response: {str(e)}")
         return sql.strip(), search_results
-        
-  # Display welcome message if no queries have been made
+
+    # Display welcome message if no queries have been made
     if not st.session_state.messages:
-        st.markdown("💡 **Welcome! I’m the Snowflake AI Assistant, ready to assist you with grant data analysis, summaries, and answers — simply type your question to get started**")
+        st.markdown("💡 **Welcome! I’m the Snowflake Cortex AI Assistant, ready to assist you with grant data analysis — simply type your question to get started**")
 
     # Visualization Function
     def display_chart_tab(df: pd.DataFrame, prefix: str = "chart", query: str = ""):
@@ -276,7 +285,6 @@ else:
         if df.empty or len(df.columns) < 2:
             return  # Do not show anything if visualization is not possible
 
-        # Determine default chart type based on query
         query_lower = query.lower()
         if re.search(r'\b(county|jurisdiction)\b', query_lower):
             default_chart = "Pie Chart"
@@ -383,7 +391,7 @@ else:
     st.sidebar.subheader("Sample Questions")
     sample_questions = [
         "what is the total actual award budget?",
-        "What is the total actual award posted ",
+        "What is the total actual award posted",
         "What is the total amount of award encumbrances approved",
         "What is the total task actual posted by award name?"
     ]
@@ -397,7 +405,6 @@ else:
                     st.code(message["sql"], language="sql")
                 st.markdown(f"**Query Results ({len(message['results'])} rows):**")
                 st.dataframe(message["results"])
-                # Only show visualization if it can be rendered
                 if not message["results"].empty and len(message["results"].columns) >= 2:
                     st.markdown("**📈 Visualization:**")
                     display_chart_tab(message["results"], prefix=f"chart_{hash(message['content'])}", query=message.get("query", ""))
@@ -412,10 +419,11 @@ else:
         # Reset chart selections for new query
         st.session_state.chart_x_axis = None
         st.session_state.chart_y_axis = None
-        st.session_state.chart_type = "Bar Chart"  # Will be overridden in display_chart_tab based on query
+        st.session_state.chart_type = "Bar Chart"
 
-        # Add user query to chat history
+        # Add user query to chat history and messages
         st.session_state.chat_history.append({"role": "user", "content": query})
+        st.session_state.messages.append({"role": "user", "content": query})
         with st.chat_message("user"):
             st.markdown(query)
 
@@ -425,9 +433,24 @@ else:
                 is_complete = is_complete_query(query)
                 is_summarize = is_summarize_query(query)
                 is_suggestion = is_question_suggestion_query(query)
+                is_greeting = is_greeting_query(query)
 
                 assistant_response = {"role": "assistant", "content": "", "query": query}
-                if is_suggestion:
+                if is_greeting:
+                    response_content = (
+                        "Hello! Welcome to the GRANTS AI Assistant! I'm here to help you explore and analyze "
+                        "grant-related data, answer questions about awards, budgets, and more, or provide insights "
+                        "from documents.\n\nHere are some questions you can try:\n"
+                        "- What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?\n"
+                        "- Give me date-wise award breakdowns.\n"
+                        "- What is this document about?\n"
+                        "- List all subject areas.\n\n"
+                        "Feel free to ask anything, or pick one of the suggested questions to get started!"
+                    )
+                    st.markdown(response_content)
+                    assistant_response["content"] = response_content
+
+                elif is_suggestion:
                     response_content = "**Here are some questions you can ask me:**\n"
                     for i, q in enumerate(sample_questions, 1):
                         response_content += f"{i}. {q}\n"
@@ -463,7 +486,6 @@ else:
                     if sql:
                         results = run_snowflake_query(sql)
                         if results is not None and not results.empty:
-                            # Convert results to string and use complete function for natural language summary
                             results_text = results.to_string(index=False)
                             prompt = f"Provide a concise natural language answer to the query '{query}' using the following data, avoiding phrases like 'Based on the query results':\n\n{results_text}"
                             summary = complete(prompt)
@@ -475,7 +497,6 @@ else:
                                 st.code(sql, language="sql")
                             st.markdown(f"**Query Results ({len(results)} rows):**")
                             st.dataframe(results)
-                            # Only show visualization if it can be rendered
                             if len(results.columns) >= 2:
                                 st.markdown("**📈 Visualization:**")
                                 display_chart_tab(results, prefix=f"chart_{hash(query)}", query=query)
@@ -504,7 +525,7 @@ else:
                             response_content = f"**Here is the Answer:**\n{summary}"
                             last_sentence = summary.split(".")[-2] if "." in summary else summary
                             st.markdown(response_content)
-                            st.success(f" Key Insight: {last_sentence.strip()}")
+                            st.success(f"Key Insight: {last_sentence.strip()}")
                             assistant_response["content"] = response_content
                         else:
                             response_content = f"**🔍 Key Information (Unsummarized):**\n{summarize_unstructured_answer(raw_result)}"
@@ -515,8 +536,9 @@ else:
                         st.warning(response_content)
                         assistant_response["content"] = response_content
 
-                # Add assistant response to chat history
+                # Add assistant response to chat history and messages
                 st.session_state.chat_history.append(assistant_response)
+                st.session_state.messages.append(assistant_response)
                 # Update current query and results
                 st.session_state.current_query = query
                 st.session_state.current_results = assistant_response.get("results")
