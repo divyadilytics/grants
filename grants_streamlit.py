@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import plotly.express as px  # Added for interactive visualizations
 
 # Snowflake/Cortex Configuration
-HOST = "bnkzyio-ljb86662.snowflakecomputing.com"
+HOST = "GBJYVCT-LSB50763.snowflakecomputing.com"
 DATABASE = "AI"
 SCHEMA = "DWH_MART"
 # STAGE = "CORTEX_SEARCH"
@@ -18,7 +18,7 @@ API_TIMEOUT = 50000  # in milliseconds
 CORTEX_SEARCH_SERVICES = "AI.DWH_MART.Grants_search_services"
 
 # Single semantic model
-SEMANTIC_MODEL = '@"AI"."DWH_MART"."GRANTS"/GRANTSyaml.yaml'
+SEMANTIC_MODEL = '@"AI"."DWH_MART"."GRANTS"/GRANTSyaml_27.yaml'
 
 # Streamlit Page Config
 st.set_page_config(
