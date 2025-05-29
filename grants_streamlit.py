@@ -17,7 +17,7 @@ API_TIMEOUT = 50000
 CORTEX_SEARCH_SERVICES = "AI.DWH_MART.Grants_search_services"
 
 # Single semantic model
-SEMANTIC_MODEL = '@"AI"."DWH_MART"."GRANTS"/GRANTSyaml_27.yaml'
+SEMANTIC_MODEL = '@"AI"."DWH_MART"."GRANTS"/grantsyaml_27.yaml'
 
 # Streamlit Page Config
 st.set_page_config(
