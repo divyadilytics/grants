@@ -1,4 +1,3 @@
-```python
 import streamlit as st
 import json
 import re
@@ -825,4 +824,3 @@ else:
                 st.session_state.current_results = assistant_response.get("results")
                 st.session_state.current_sql = assistant_response.get("sql")
                 st.session_state.current_summary = assistant_response.get("summary")
-```
