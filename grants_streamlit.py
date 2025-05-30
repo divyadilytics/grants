@@ -82,7 +82,6 @@ if "show_greeting" not in st.session_state:
     st.session_state.show_greeting = True
 if "data_source" not in st.session_state:
     st.session_state.data_source = "Database"
-# Add session state variables for toggling About and Help content
 if "show_about" not in st.session_state:
     st.session_state.show_about = False
 if "show_help" not in st.session_state:
@@ -579,7 +578,7 @@ else:
             "explain five layers in High level Architecture"
         ]
         for sample in sample_questions:
-            if st.button(sample, key=sample):
+            if st.button(sample, key=f"sidebar_{sample}"):
                 query = sample
                 st.session_state.show_greeting = False
 
@@ -630,10 +629,6 @@ else:
     query = st.chat_input("Ask your question...")
     if query and query.lower().startswith("no of"):
         query = query.replace("no of", "number of", 1)
-    for sample in sample_questions:
-        if st.sidebar.button(sample, key=sample):
-            query = sample
-            st.session_state.show_greeting = False
 
     if query:
         st.session_state.show_greeting = False
