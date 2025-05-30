@@ -578,10 +578,19 @@ else:
 
     st.sidebar.subheader("Sample Questions")
     sample_questions = [
-        "what is the total actual award budget?",
-        "What is the total actual award posted",
-        "What is the total amount of award encumbrances approved",
-        "What is the total task actual posted by award name?"
+        "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
+        "Give me date wise award breakdowns",
+        "Give me award breakdowns",
+        "Give me date wise award budget, actual award posted, award encumbrance posted, award encumbrance approved",
+        "What is the task actual posted by award name?",
+        "What is the award budget posted by date for these awards?",
+        "What is the total award encumbrance posted for these awards?",
+        "What is the total amount of award encumbrances approved?",
+        "What is the total actual award posted for these awards?",
+        "what is the award budget posted?",
+        "what is this document about",
+        "Subject areas",
+        "explain five layers in High level Architecture"
     ]
 
     for message in st.session_state.chat_history:
@@ -637,46 +646,51 @@ else:
 
                 if is_greeting and original_query.lower().strip() == "hi":
                     response_content = """
-                     "Hi! How can I help you?\n"
-    "The **Property Management module** enables you to analyze data related to properties, leases, tenants, rent, and occupancy metrics. "
-    "Ask about occupancy rates, lease terms, tenant payments, or supplier details to get started!\n\n"
-    "Here are some questions you can try:\n"
-    "- What is the total actual award budget?\n"
-    "- What is the total actual award posted?\n"
-    "- What is the total amount of award encumbrances approved?\n"
-    "- What is the total task actual posted by award name?\n"
+                    Hello! Welcome to the GRANTS AI Assistant! I'm here to help you explore and analyze grant-related data, answer questions about awards, budgets, and more, or provide insights from documents.
+
+                    Here are some questions you can try:
+
+                    What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?
+                    Give me date-wise award breakdowns.
+                    What is this document about?
+                    List all subject areas.
+                    Feel free to ask anything, or pick one of the suggested questions to get started!
                     """
                     with response_placeholder:
                         st.write_stream(stream_text(response_content))
                         st.markdown(response_content, unsafe_allow_html=True)
                     assistant_response["content"] = response_content
                     st.session_state.messages.append({"role": "assistant", "content": response_content})
-                    st.session_state.last_suggestions = sample_questions[:5]
+                    st.session_state.last_suggestions = [
+                        "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
+                        "Give me date wise award breakdowns",
+                        "What is this document about",
+                        "Subject areas"
+                    ]
 
                 elif is_greeting or is_suggestion:
                     greeting = original_query.lower().split()[0]
                     if greeting not in ["hi", "hello", "hey", "greet"]:
                         greeting = "hello"
                     response_content = (
-                        f"{greeting}! Welcome to the GRANTS AI Assistant! I'm here to help you explore and analyze\n"
-                        "grant-related data, answer questions about awards, budgets, and more, or provide insights\n"
-                        "from documents.\n\n"
-                        "Here are some questions you can try:\n"
-                        "- What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?\n"
-                        "- Give me date-wise award breakdowns.\n"
-                        "- What is this document about?\n"
-                        "- List all subject areas.\n\n"
+                        f"Hello! Welcome to the GRANTS AI Assistant! I'm here to help you explore and analyze grant-related data, answer questions about awards, budgets, and more, or provide insights from documents.\n\n"
+                        "Here are some questions you can try:\n\n"
+                        "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?\n"
+                        "Give me date-wise award breakdowns.\n"
+                        "What is this document about?\n"
+                        "List all subject areas.\n\n"
                         "Feel free to ask anything, or pick one of the suggested questions to get started!"
                     )
-                    selected_questions = sample_questions[:5]
-                    for i, q in enumerate(selected_questions, 1):
-                        response_content += f"{i}. {q}\n"
-                    response_content += "\nFeel free to ask any of these or come up with your own related to procurement analytics!"
                     with response_placeholder:
                         st.write_stream(stream_text(response_content))
                         st.markdown(response_content, unsafe_allow_html=True)
                     assistant_response["content"] = response_content
-                    st.session_state.last_suggestions = selected_questions
+                    st.session_state.last_suggestions = [
+                        "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
+                        "Give me date wise award breakdowns",
+                        "What is this document about",
+                        "Subject areas"
+                    ]
                     st.session_state.messages.append({"role": "assistant", "content": response_content})
 
                 elif is_complete:
