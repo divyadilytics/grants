@@ -321,38 +321,42 @@ def create_prompt(user_question):
     return complete(st.session_state.model_name, prompt)
 
 if not st.session_state.authenticated:
-    st.title("Welcome to Snowflake Cortex AI")
-    st.markdown("Please login to interact with your data")
-    st.session_state.username = st.text_input("Enter Snowflake Username:", value=st.session_state.username)
-    st.session_state.password = st.text_input("Enter Password:", type="password")
-    if st.button("Login"):
-        try:
-            conn = snowflake.connector.connect(
-                user=st.session_state.username,
-                password=st.session_state.password,
-                account="GBJYVCT-LSB50763",
-                host=HOST,
-                port=443,
-                warehouse="COMPUTE_WH",
-                role="ACCOUNTADMIN",
-                database=DATABASE,
-                schema=SCHEMA,
-            )
-            st.session_state.CONN = conn
-            snowpark_session = Session.builder.configs({
-                "connection": conn
-            }).create()
-            st.session_state.snowpark_session = snowpark_session
-            with conn.cursor() as cur:
-                cur.execute(f"USE DATABASE {DATABASE}")
-                cur.execute(f"USE SCHEMA {SCHEMA}")
-                cur.execute("ALTER SESSION SET TIMEZONE = 'UTC'")
-                cur.execute("ALTER SESSION SET QUOTED_IDENTIFIERS_IGNORE_CASE = TRUE")
-            st.session_state.authenticated = True
-            st.success("Authentication successful! Redirecting...")
-            st.rerun()
-        except Exception as e:
-            st.error(f"Authentication failed: {e}")
+    with st.container():
+        st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+        st.title("Welcome to Snowflake Cortex AI")
+        st.markdown("Please login to interact with your data")
+        st.session_state.username = st.text_input("Enter Snowflake Username:", value=st.session_state.username)
+        st.session_state.password = st.text_input("Enter Password:", type="password")
+        if st.button("Login"):
+            try:
+                conn = snowflake.connector.connect(
+                    user=st.session_state.username,
+                    password=st.session_state.password,
+                    account="GBJYVCT-LSB50763",
+                    host=HOST,
+                    port=443,
+                    warehouse="COMPUTE_WH",
+                    role="ACCOUNTADMIN",
+                    database=DATABASE,
+                    schema=SCHEMA,
+                )
+                st.session_state.CONN = conn
+                snowpark_session = Session.builder.configs({
+                    "connection": conn
+                }).create()
+                st.session_state.snowpark_session = snowpark_session
+                with conn.cursor() as cur:
+                    cur.execute(f"USE DATABASE {DATABASE}")
+                    cur.execute(f"USE SCHEMA {SCHEMA}")
+                    cur.execute("ALTER SESSION SET TIMEZONE = 'UTC'")
+                    cur.execute("ALTER SESSION SET QUOTED_IDENTIFIERS_IGNORE_CASE = TRUE")
+                st.session_state.authenticated = True
+                st.success("Authentication successful! Redirecting...")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Authentication failed: {e}")
+        st.markdown('</div>', unsafe_allow_html=True)
+
 else:
     session = st.session_state.snowpark_session
     root = Root(session)
@@ -639,22 +643,6 @@ else:
                 "- [Contact Support](https://www.snowflake.com/en/support/)"
             )
 
-    # Main content area
-    st.title("Cortex AI Assistant by DiLytics")
-    semantic_model_filename = SEMANTIC_MODEL.split("/")[-1]
-    st.markdown(f"Semantic Model: `{semantic_model_filename}`")
-    init_service_metadata()
-
-    # Welcome message
-    if st.session_state.show_greeting and not st.session_state.chat_history:
-        st.markdown("""
-        <div class="welcome-message">
-            <h2>Welcome to the Cortex AI Assistant!</h2>
-            <p>Explore your property management data with ease. Ask about occupancy rates, lease details, tenant payments, or supplier metrics to uncover actionable insights.</p>
-            <p><strong>Get started:</strong> Type a question below or select a sample question from the sidebar!</p>
-        </div>
-        """, unsafe_allow_html=True)
-
     # Sidebar sample questions
     st.sidebar.subheader("Sample Questions")
     sample_questions = [
@@ -672,9 +660,25 @@ else:
         "What are the details of supplier payments?",
     ]
 
-    # Chat history container (scrollable)
+    # Main content area (all content above the search bar)
     with st.container():
         st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+        st.title("Cortex AI Assistant by DiLytics")
+        semantic_model_filename = SEMANTIC_MODEL.split("/")[-1]
+        st.markdown(f"Semantic Model: `{semantic_model_filename}`")
+        init_service_metadata()
+
+        # Welcome message
+        if st.session_state.show_greeting and not st.session_state.chat_history:
+            st.markdown("""
+            <div class="welcome-message">
+                <h2>Welcome to the Cortex AI Assistant!</h2>
+                <p>Explore your property management data with ease. Ask about occupancy rates, lease details, tenant payments, or supplier metrics to uncover actionable insights.</p>
+                <p><strong>Get started:</strong> Type a question below or select a sample question from the sidebar!</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # Chat history
         for message in st.session_state.chat_history:
             if message["role"] == "user":
                 st.markdown(
@@ -694,21 +698,230 @@ else:
                     if not message["results"].empty and len(message["results"].columns) >= 2:
                         st.markdown("**📈 Visualization:**")
                         display_chart_tab(message["results"], prefix=f"chart_{hash(message['content'])}", query=message.get("query", ""))
+
+        # Handle new query and response within the same container
+        query = None
+        for idx, sample in enumerate(sample_questions):
+            if st.sidebar.button(sample, key=f"sample_question_{idx}"):
+                query = sample
+                st.session_state.show_greeting = False
+
+        if query and query.lower().startswith("no of"):
+            query = query.replace("no of", "number of", 1)
+
+        if query:
+            st.session_state.show_greeting = False
+            st.session_state.chart_x_axis = None
+            st.session_state.chart_y_axis = None
+            st.session_state.chart_type = "Bar Chart"
+            original_query = query
+            if query.strip().isdigit() and st.session_state.last_suggestions:
+                try:
+                    index = int(query.strip()) - 1
+                    if 0 <= index < len(st.session_state.last_suggestions):
+                        query = st.session_state.last_suggestions[index]
+                    else:
+                        query = original_query
+                except ValueError:
+                    query = original_query
+            st.session_state.chat_history.append({"role": "user", "content": original_query})
+            st.session_state.messages.append({"role": "user", "content": original_query})
+            st.markdown(
+                f'<div class="chat-message-user">{original_query}</div>',
+                unsafe_allow_html=True
+            )
+            with st.spinner("Generating Response..."):
+                response_placeholder = st.empty()
+                is_structured = is_structured_query(query) and st.session_state.data_source == "Database"
+                is_complete = is_complete_query(query)
+                is_summarize = is_summarize_query(query)
+                is_suggestion = is_question_suggestion_query(query)
+                is_greeting = is_greeting_query(query)
+                assistant_response = {"role": "assistant", "content": "", "query": query}
+                response_content = ""
+                failed_response = False
+
+                if is_greeting and original_query.lower().strip() == "hi":
+                    response_content = """
+                    Hi! Welcome to the Cortex AI Assistant!  
+                    Dive into your property management data to analyze occupancy rates, lease terms, tenant payments, or supplier metrics.  
+                    Try a sample question from the sidebar or ask your own to get started!
+                    """
+                    with response_placeholder:
+                        st.markdown(
+                            f'<div class="chat-message-assistant">{response_content}</div>',
+                            unsafe_allow_html=True
+                        )
+                    assistant_response["content"] = response_content
+                    st.session_state.messages.append({"role": "assistant", "content": response_content})
+                    st.session_state.last_suggestions = sample_questions[:5]
+
+                elif is_greeting or is_suggestion:
+                    greeting = original_query.lower().split()[0]
+                    if greeting not in ["hi", "hello", "hey", "greet"]:
+                        greeting = "hello"
+                    response_content = f"{greeting.title()}! I'm here to help with your property management analytics questions. Here are some questions you can ask me:\n\n"
+                    selected_questions = sample_questions[:5]
+                    for i, q in enumerate(selected_questions, 1):
+                        response_content += f"{i}. {q}\n"
+                    response_content += "\nFeel free to ask any of these or come up with your own related to property management analytics!"
+                    with response_placeholder:
+                        st.markdown(
+                            f'<div class="chat-message-assistant">{response_content}</div>',
+                            unsafe_allow_html=True
+                        )
+                    assistant_response["content"] = response_content
+                    st.session_state.last_suggestions = selected_questions
+                    st.session_state.messages.append({"role": "assistant", "content": response_content})
+
+                elif is_complete:
+                    response = create_prompt(query)
+                    if response:
+                        response_content = f"**✍️ Generated Response:**\n{response}"
+                        with response_placeholder:
+                            st.markdown(
+                                f'<div class="chat-message-assistant">{response_content}</div>',
+                                unsafe_allow_html=True
+                            )
+                        assistant_response["content"] = response_content
+                        st.session_state.messages.append({"role": "assistant", "content": response_content})
+                    else:
+                        response_content = ""
+                        failed_response = True
+                        assistant_response["content"] = response_content
+
+                elif is_summarize:
+                    summary = summarize(query)
+                    if summary:
+                        response_content = f"**Summary:**\n{summary}"
+                        with response_placeholder:
+                            st.markdown(
+                                f'<div class="chat-message-assistant">{response_content}</div>',
+                                unsafe_allow_html=True
+                            )
+                        assistant_response["content"] = response_content
+                        st.session_state.messages.append({"role": "assistant", "content": response_content})
+                    else:
+                        response_content = ""
+                        failed_response = True
+                        assistant_response["content"] = response_content
+
+                elif st.session_state.data_source == "Database" and is_structured:
+                    response = snowflake_api_call(query, is_structured=True)
+                    sql, _ = process_sse_response(response, is_structured=True)
+                    if sql:
+                        if st.session_state.debug_mode:
+                            st.sidebar.text_area("Generated SQL", sql, height=150)
+                        results = run_snowflake_query(sql)
+                        if results is not None and not results.empty:
+                            results_text = results.to_string(index=False)
+                            prompt = f"Provide a concise natural language answer to the query '{query}' using the following data, avoiding phrases like 'Based on the query results':\n\n{results_text}"
+                            summary = complete(st.session_state.model_name, prompt)
+                            if not summary:
+                                summary = "⚠️ Unable to generate a natural language summary."
+                            response_content = f"**✍️ Generated Response:**\n{summary}"
+                            with response_placeholder:
+                                st.markdown(
+                                    f'<div class="chat-message-assistant">{response_content}</div>',
+                                    unsafe_allow_html=True
+                                )
+                            with st.expander("View SQL Query", expanded=False):
+                                st.code(sql, language="sql")
+                            st.markdown(f"**Query Results ({len(results)} rows):**")
+                            st.dataframe(results)
+                            if len(results.columns) >= 2:
+                                st.markdown("**📈 Visualization:**")
+                                display_chart_tab(results, prefix=f"chart_{hash(query)}", query=query)
+                            assistant_response.update({
+                                "content": response_content,
+                                "sql": sql,
+                                "results": results,
+                                "summary": summary
+                            })
+                            st.session_state.messages.append({
+                                "role": "assistant",
+                                "content": response_content,
+                                "sql": sql,
+                                "results": results,
+                                "summary": summary
+                            })
+                        else:
+                            response_content = "No data returned for the query."
+                            failed_response = True
+                            assistant_response["content"] = response_content
+                    else:
+                        response_content = "Failed to generate SQL query."
+                        failed_response = True
+                        assistant_response["content"] = response_content
+
+                elif st.session_state.data_source == "Document":
+                    response = snowflake_api_call(query, is_structured=False)
+                    _, search_results = process_sse_response(response, is_structured=False)
+                    if search_results:
+                        raw_result = search_results[0]
+                        summary = create_prompt(query)
+                        if summary:
+                            response_content = f"**Here is the Answer:**\n{summary}"
+                            with response_placeholder:
+                                st.markdown(
+                                    f'<div class="chat-message-assistant">{response_content}</div>',
+                                    unsafe_allow_html=True
+                                )
+                            assistant_response["content"] = response_content
+                            st.session_state.messages.append({"role": "assistant", "content": response_content})
+                        else:
+                            response_content = f"**🔍 Key Information (Unsummarized):**\n{summarize_unstructured_answer(raw_result)}"
+                            with response_placeholder:
+                                st.markdown(
+                                    f'<div class="chat-message-assistant">{response_content}</div>',
+                                    unsafe_allow_html=True
+                                )
+                            assistant_response["content"] = response_content
+                            st.session_state.messages.append({"role": "assistant", "content": response_content})
+                    else:
+                        response_content = ""
+                        failed_response = True
+                        assistant_response["content"] = response_content
+
+                else:
+                    response_content = "Please select a data source to proceed with your query."
+                    with response_placeholder:
+                        st.markdown(
+                            f'<div class="chat-message-assistant">{response_content}</div>',
+                            unsafe_allow_html=True
+                        )
+                    assistant_response["content"] = response_content
+                    st.session_state.messages.append({"role": "assistant", "content": response_content})
+
+                if failed_response:
+                    suggestions = suggest_sample_questions(query)
+                    response_content = "I am not sure about your question. Here are some questions you can ask me:\n\n"
+                    for i, suggestion in enumerate(suggestions, 1):
+                        response_content += f"{i}. {suggestion}\n"
+                    response_content += "\nThese questions might help clarify your query. Feel free to try one or rephrase your question!"
+                    with response_placeholder:
+                        st.markdown(
+                            f'<div class="chat-message-assistant">{response_content}</div>',
+                            unsafe_allow_html=True
+                        )
+                    assistant_response["content"] = response_content
+                    st.session_state.last_suggestions = suggestions
+                    st.session_state.messages.append({"role": "assistant", "content": response_content})
+
+                st.session_state.chat_history.append(assistant_response)
+                st.session_state.current_query = query
+                st.session_state.current_results = assistant_response.get("results")
+                st.session_state.current_sql = assistant_response.get("sql")
+                st.session_state.current_summary = assistant_response.get("summary")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # Chat input container (fixed at bottom)
+    # Chat input container (fixed at bottom, placed after all other content)
     with st.container():
         st.markdown('<div class="chat-input-container">', unsafe_allow_html=True)
         query = st.chat_input("Ask your question...")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    if query and query.lower().startswith("no of"):
-        query = query.replace("no of", "number of", 1)
-    for idx, sample in enumerate(sample_questions):
-        if st.sidebar.button(sample, key=f"sample_question_{idx}"):
-            query = sample
-            st.session_state.show_greeting = False
-
+    # Handle query input within the main container above
     if query:
         st.session_state.show_greeting = False
         st.session_state.chart_x_axis = None
@@ -724,10 +937,10 @@ else:
                     query = original_query
             except ValueError:
                 query = original_query
-        st.session_state.chat_history.append({"role": "user", "content": original_query})
-        st.session_state.messages.append({"role": "user", "content": original_query})
         with st.container():
             st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+            st.session_state.chat_history.append({"role": "user", "content": original_query})
+            st.session_state.messages.append({"role": "user", "content": original_query})
             st.markdown(
                 f'<div class="chat-message-user">{original_query}</div>',
                 unsafe_allow_html=True
