@@ -86,6 +86,9 @@ if "show_about" not in st.session_state:
     st.session_state.show_about = False
 if "show_help" not in st.session_state:
     st.session_state.show_help = False
+# Add session state for query to persist across reruns
+if "query" not in st.session_state:
+    st.session_state.query = None
 
 # Hide Streamlit branding and prevent chat history shading
 st.markdown("""
@@ -116,6 +119,7 @@ def start_new_conversation():
     st.session_state.last_suggestions = []
     st.session_state.clear_conversation = False
     st.session_state.show_greeting = True  # Reset to show greeting on new conversation
+    st.session_state.query = None  # Reset query
     st.rerun()
 
 def init_service_metadata():
@@ -540,6 +544,7 @@ else:
     with st.sidebar:
         st.markdown("""
         <style>
+        /* Default styling for sidebar buttons (suggested questions, Clear conversation, etc.) */
         [data-testid="stSidebar"] [data-testid="stButton"] > button {
             background-color: #29B5E8 !important;
             color: white !important;
@@ -549,6 +554,14 @@ else:
             margin: 0 !important;
             border: none !important;
             padding: 0.5rem 1rem !important;
+        }
+        /* Custom styling for About and Help & Documentation buttons */
+        [data-testid="stSidebar"] [data-testid="stButton"][aria-label="About"] > button,
+        [data-testid="stSidebar"] [data-testid="stButton"][aria-label="Help & Documentation"] > button {
+            background-color: #D3D3D3 !important;
+            color: #000000 !important;
+            font-weight: normal !important;
+            border: 1px solid #000000 !important;
         }
         </style>
         """, unsafe_allow_html=True)
@@ -579,7 +592,7 @@ else:
         ]
         for sample in sample_questions:
             if st.button(sample, key=f"sidebar_{sample}"):
-                query = sample
+                st.session_state.query = sample
                 st.session_state.show_greeting = False
 
         # Add About and Help & Documentation buttons
@@ -626,11 +639,17 @@ else:
                     st.markdown("**📈 Visualization:**")
                     display_chart_tab(message["results"], prefix=f"chart_{hash(message['content'])}", query=message.get("query", ""))
 
-    query = st.chat_input("Ask your question...")
-    if query and query.lower().startswith("no of"):
-        query = query.replace("no of", "number of", 1)
+    # Get query from chat input or session state
+    chat_input_query = st.chat_input("Ask your question...")
+    if chat_input_query:
+        st.session_state.query = chat_input_query
 
-    if query:
+    # Process the query (either from chat input or a clicked button)
+    if st.session_state.query:
+        query = st.session_state.query
+        if query.lower().startswith("no of"):
+            query = query.replace("no of", "number of", 1)
+        
         st.session_state.show_greeting = False
         st.session_state.chart_x_axis = None
         st.session_state.chart_y_axis = None
@@ -841,3 +860,5 @@ else:
                 st.session_state.current_results = assistant_response.get("results")
                 st.session_state.current_sql = assistant_response.get("sql")
                 st.session_state.current_summary = assistant_response.get("summary")
+                # Reset the query after processing to avoid reprocessing on rerun
+                st.session_state.query = None
