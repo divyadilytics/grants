@@ -144,32 +144,8 @@ def init_service_metadata():
             st.session_state.service_metadata = [{"name": CORTEX_SEARCH_SERVICES, "search_column": ""}]
 
 def init_config_options():
-    st.sidebar.selectbox(
-        "Select cortex search service:",
-        [s["name"] for s in st.session_state.service_metadata] or [CORTEX_SEARCH_SERVICES],
-        key="selected_cortex_search_service"
-    )
-    st.sidebar.button("Clear conversation", on_click=start_new_conversation)
-    st.sidebar.toggle("Debug", key="debug_mode", value=st.session_state.debug_mode)
-    st.sidebar.toggle("Use chat history", key="use_chat_history", value=True)
-    with st.sidebar.expander("Advanced options"):
-        st.selectbox("Select model:", MODELS, key="model_name")
-        st.number_input(
-            "Select number of context chunks",
-            value=100,
-            key="num_retrieved_chunks",
-            min_value=1,
-            max_value=400
-        )
-        st.number_input(
-            "Select number of messages to use in chat history",
-            value=10,
-            key="num_chat_messages",
-            min_value=1,
-            max_value=100
-        )
-    if st.session_state.debug_mode:
-        st.sidebar.expander("Session State").write(st.session_state)
+    # This function is now empty as all elements have been moved to the sidebar directly
+    pass
 
 def query_cortex_search_service(query):
     try:
@@ -561,7 +537,7 @@ else:
     with st.sidebar:
         st.markdown("""
         <style>
-        /* Default styling for sidebar buttons (suggested questions, Clear conversation, history questions, etc.) */
+        /* Default styling for sidebar buttons (suggested questions) */
         [data-testid="stSidebar"] [data-testid="stButton"] > button {
             background-color: #29B5E8 !important;
             color: white !important;
@@ -572,7 +548,8 @@ else:
             border: none !important;
             padding: 0.5rem 1rem !important;
         }
-        /* Custom styling for About, Help & Documentation, and History buttons */
+        /* Custom styling for Clear conversation, About, Help & Documentation, and History buttons */
+        [data-testid="stSidebar"] [data-testid="stButton"][aria-label="Clear conversation"] > button,
         [data-testid="stSidebar"] [data-testid="stButton"][aria-label="About"] > button,
         [data-testid="stSidebar"] [data-testid="stButton"][aria-label="Help & Documentation"] > button,
         [data-testid="stSidebar"] [data-testid="stButton"][aria-label="History"] > button {
@@ -584,17 +561,43 @@ else:
         </style>
         """, unsafe_allow_html=True)
 
-        # Upper Section: Logo, Config Options, Data Source, Sample Questions
-        with st.container():
-            logo_container = st.container()
-            button_container = st.container()
-            with logo_container:
-                logo_url = "https://www.snowflake.com/wp-content/themes/snowflake/assets/img/logo-blue.svg"
-                st.image(logo_url, width=250)
-            with button_container:
-                init_config_options()
-                st.radio("Select Data Source:", ["Database", "Document"], key="data_source")
+        # Logo
+        logo_url = "https://www.snowflake.com/wp-content/themes/snowflake/assets/img/logo-blue.svg"
+        st.image(logo_url, width=250)
 
+        # First Section: Select Data Source, Config Options, Sample Questions
+        with st.container():
+            # Select Data Source
+            st.radio("Select Data Source:", ["Database", "Document"], key="data_source")
+
+            # Config Options
+            st.selectbox(
+                "Select cortex search service:",
+                [s["name"] for s in st.session_state.service_metadata] or [CORTEX_SEARCH_SERVICES],
+                key="selected_cortex_search_service"
+            )
+            st.toggle("Debug", key="debug_mode", value=st.session_state.debug_mode)
+            st.toggle("Use chat history", key="use_chat_history", value=True)
+            with st.expander("Advanced options"):
+                st.selectbox("Select model:", MODELS, key="model_name")
+                st.number_input(
+                    "Select number of context chunks",
+                    value=100,
+                    key="num_retrieved_chunks",
+                    min_value=1,
+                    max_value=400
+                )
+                st.number_input(
+                    "Select number of messages to use in chat history",
+                    value=10,
+                    key="num_chat_messages",
+                    min_value=1,
+                    max_value=100
+                )
+            if st.session_state.debug_mode:
+                st.expander("Session State").write(st.session_state)
+
+            # Sample Questions
             st.subheader("Sample Questions")
             sample_questions = [
                 "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
@@ -616,12 +619,16 @@ else:
                     st.session_state.query = sample
                     st.session_state.show_greeting = False
 
-        # Divider between sections
+        # Divider
         st.markdown("---")
 
-        # Lower Section: History, About, Help & Documentation
+        # Second Section: Clear conversation, History, About, Help & Documentation
         with st.container():
-            # Add History button
+            # Clear conversation button
+            if st.button("Clear conversation", key="clear_conversation_button"):
+                start_new_conversation()
+
+            # History button and content
             if st.button("History", key="history_button"):
                 toggle_history()
             if st.session_state.show_history:
@@ -635,7 +642,7 @@ else:
                             st.session_state.query = question
                             st.session_state.show_greeting = False
 
-            # Add About and Help & Documentation buttons
+            # About button and content
             if st.button("About", key="about_button"):
                 toggle_about()
             if st.session_state.show_about:
@@ -646,6 +653,7 @@ else:
                     "Simply ask a question below to see relevant answers and visualizations."
                 )
 
+            # Help & Documentation button and content
             if st.button("Help & Documentation", key="help_button"):
                 toggle_help()
             if st.session_state.show_help:
