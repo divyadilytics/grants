@@ -316,8 +316,8 @@ else:
 
     def is_structured_query(query: str):
         structured_patterns = [
-            r'\b(count|number|where|group by|order by|sum|avg|max|min|total|how many|which|show|list|names?|are there any|rejected deliveries?|least|highest|duration|approval)\b',
-            r'\b(vendor|supplier|requisition|purchase order|po|organization|department|buyer|delivery|received|billed|rejected|late|on time|late deliveries?|Suppliers|payment|billing|percentage|list)\b'
+            r'\b(count|number|where|group by|order by|sum|avg|max|min|total|how many|which|show|list|names?|are there any|least|highest|duration|approval)\b',
+            r'\b(award|budget|posted|encumbrance|date|task|actual|approved|total)\b'  # Added grants-related terms
         ]
         return any(re.search(pattern, query.lower()) for pattern in structured_patterns)
 
@@ -635,27 +635,31 @@ else:
         with st.chat_message("assistant"):
             with st.spinner("Generating Response..."):
                 response_placeholder = st.empty()
+                # Ensure data_source is set to "Database" if unset or invalid
+                if st.session_state.data_source not in ["Database", "Document"]:
+                    st.session_state.data_source = "Database"
                 is_structured = is_structured_query(query) and st.session_state.data_source == "Database"
                 is_complete = is_complete_query(query)
                 is_summarize = is_summarize_query(query)
                 is_suggestion = is_question_suggestion_query(query)
                 is_greeting = is_greeting_query(query)
+                # Debugging: Log the values to understand the condition
+                if st.session_state.debug_mode:
+                    st.sidebar.text_area("Debug Info", f"is_structured: {is_structured}\nData Source: {st.session_state.data_source}", height=100)
                 assistant_response = {"role": "assistant", "content": "", "query": query}
                 response_content = ""
                 failed_response = False
 
                 if is_greeting and original_query.lower().strip() == "hi":
                     response_content = """
-                    Hello! Welcome to the GRANTS AI Assistant!\n
-                    I'm here to help you explore and analyze grant-related data, answer questions about awards, budgets, and more, or provide insights from documents.
+                    Hello! Welcome to the GRANTS AI Assistant! I'm here to help you explore and analyze grant-related data, answer questions about awards, budgets, and more, or provide insights from documents.
 
-                    Here are some questions you can try:\n
+                    Here are some questions you can try:
 
-                    1.What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?\n
-                    2.Give me date-wise award breakdowns.\n
-                    3.What is this document about?
-                    4.List all subject areas.
-                    
+                    What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?
+                    Give me date-wise award breakdowns.
+                    What is this document about?
+                    List all subject areas.
                     Feel free to ask anything, or pick one of the suggested questions to get started!
                     """
                     with response_placeholder:
