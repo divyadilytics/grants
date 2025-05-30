@@ -18,7 +18,7 @@ API_ENDPOINT = "/api/v2/cortex/agent:run"
 API_TIMEOUT = 50000  # in milliseconds
 CORTEX_SEARCH_SERVICES = "AI.DWH_MART.Grants_search_services"
 CECON_SEARCH_SERVICES = "AI.DWH_MART.Grants_search_services"
-SEMANTIC_MODEL = '@"AI"."DWH_MART"."GRANTS"/grantsyaml_27.yaml'
+SEMANTIC_MODEL = '@"AI"."DWH_MART"."GRANTS"/GRANTSyaml_27.yaml'
 
 # Model options
 MODELS = [
@@ -82,6 +82,11 @@ if "show_greeting" not in st.session_state:
     st.session_state.show_greeting = True
 if "data_source" not in st.session_state:
     st.session_state.data_source = "Database"
+# Add session state variables for toggling About and Help content
+if "show_about" not in st.session_state:
+    st.session_state.show_about = False
+if "show_help" not in st.session_state:
+    st.session_state.show_help = False
 
 # Hide Streamlit branding and prevent chat history shading
 st.markdown("""
@@ -317,7 +322,7 @@ else:
     def is_structured_query(query: str):
         structured_patterns = [
             r'\b(count|number|where|group by|order by|sum|avg|max|min|total|how many|which|show|list|names?|are there any|least|highest|duration|approval)\b',
-            r'\b(award|budget|posted|encumbrance|date|task|actual|approved|total)\b'  # Added grants-related terms
+            r'\b(award|budget|posted|encumbrance|date|task|actual|approved|total)\b'
         ]
         return any(re.search(pattern, query.lower()) for pattern in structured_patterns)
 
@@ -525,6 +530,14 @@ else:
             if st.session_state.debug_mode:
                 st.sidebar.error(f"Chart Error Details: {str(e)}")
 
+    def toggle_about():
+        st.session_state.show_about = not st.session_state.show_about
+        st.session_state.show_help = False  # Close the other section if open
+
+    def toggle_help():
+        st.session_state.show_help = not st.session_state.show_help
+        st.session_state.show_about = False  # Close the other section if open
+
     with st.sidebar:
         st.markdown("""
         <style>
@@ -542,22 +555,48 @@ else:
         """, unsafe_allow_html=True)
         logo_container = st.container()
         button_container = st.container()
-        about_container = st.container()
-        help_container = st.container()
         with logo_container:
             logo_url = "https://www.snowflake.com/wp-content/themes/snowflake/assets/img/logo-blue.svg"
             st.image(logo_url, width=250)
         with button_container:
             init_config_options()
             st.radio("Select Data Source:", ["Database", "Document"], key="data_source")
-        with about_container:
+
+        st.subheader("Sample Questions")
+        sample_questions = [
+            "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
+            "Give me date wise award breakdowns",
+            "Give me award breakdowns",
+            "Give me date wise award budget, actual award posted, award encumbrance posted, award encumbrance approved",
+            "What is the task actual posted by award name?",
+            "What is the award budget posted by date for these awards?",
+            "What is the total award encumbrance posted for these awards?",
+            "What is the total amount of award encumbrances approved?",
+            "What is the total actual award posted for these awards?",
+            "what is the award budget posted?",
+            "what is this document about",
+            "Subject areas",
+            "explain five layers in High level Architecture"
+        ]
+        for sample in sample_questions:
+            if st.button(sample, key=sample):
+                query = sample
+                st.session_state.show_greeting = False
+
+        # Add About and Help & Documentation buttons
+        if st.button("About", key="about_button"):
+            toggle_about()
+        if st.session_state.show_about:
             st.markdown("### About")
             st.write(
                 "This application uses **Snowflake Cortex Analyst** to interpret "
                 "your natural language questions and generate data insights. "
                 "Simply ask a question below to see relevant answers and visualizations."
             )
-        with help_container:
+
+        if st.button("Help & Documentation", key="help_button"):
+            toggle_help()
+        if st.session_state.show_help:
             st.markdown("### Help & Documentation")
             st.write(
                 "- [User Guide](https://docs.snowflake.com/en/guides-overview-ai-features)  \n"
@@ -575,23 +614,6 @@ else:
         st.markdown("Welcome! I’m the Snowflake AI Assistant, ready to assist you with grant data analysis, summaries, and answers — simply type your question to get started.")
     else:
         st.session_state.show_greeting = False
-
-    st.sidebar.subheader("Sample Questions")
-    sample_questions = [
-        "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
-        "Give me date wise award breakdowns",
-        "Give me award breakdowns",
-        "Give me date wise award budget, actual award posted, award encumbrance posted, award encumbrance approved",
-        "What is the task actual posted by award name?",
-        "What is the award budget posted by date for these awards?",
-        "What is the total award encumbrance posted for these awards?",
-        "What is the total amount of award encumbrances approved?",
-        "What is the total actual award posted for these awards?",
-        "what is the award budget posted?",
-        "what is this document about",
-        "Subject areas",
-        "explain five layers in High level Architecture"
-    ]
 
     for message in st.session_state.chat_history:
         with st.chat_message(message["role"]):
