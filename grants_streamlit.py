@@ -622,8 +622,8 @@ else:
             if not user_questions:
                 st.write("No questions in history yet.")
             else:
-                for question in user_questions:
-                    if st.button(question, key=f"history_{question}"):
+                for idx, question in enumerate(user_questions):
+                    if st.button(question, key=f"history_{idx}"):
                         st.session_state.query = question
                         st.session_state.show_greeting = False
 
