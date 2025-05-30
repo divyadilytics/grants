@@ -666,7 +666,14 @@ else:
                     greeting = original_query.lower().split()[0]
                     if greeting not in ["hi", "hello", "hey", "greet"]:
                         greeting = "hello"
-                    response_content = f"{greeting}! I'm here to help with your procurement analytics questions. Here are some questions you can ask me:\n\n"
+                    response_content = f"{greeting}!  Welcome to the GRANTS AI Assistant! I'm here to help you explore and analyze "
+                        "grant-related data, answer questions about awards, budgets, and more, or provide insights "
+                        "from documents.\n\nHere are some questions you can try:\n"
+                        "- What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?\n"
+                        "- Give me date-wise award breakdowns.\n"
+                        "- What is this document about?\n"
+                        "- List all subject areas.\n\n"
+                        "Feel free to ask anything, or pick one of the suggested questions to get started!":\n\n"
                     selected_questions = sample_questions[:5]
                     for i, q in enumerate(selected_questions, 1):
                         response_content += f"{i}. {q}\n"
