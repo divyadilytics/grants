@@ -86,7 +86,8 @@ if "show_about" not in st.session_state:
     st.session_state.show_about = False
 if "show_help" not in st.session_state:
     st.session_state.show_help = False
-# Add session state for query to persist across reruns
+if "show_history" not in st.session_state:
+    st.session_state.show_history = False
 if "query" not in st.session_state:
     st.session_state.query = None
 
@@ -118,8 +119,9 @@ def start_new_conversation():
     st.session_state.chart_type = "Bar Chart"
     st.session_state.last_suggestions = []
     st.session_state.clear_conversation = False
-    st.session_state.show_greeting = True  # Reset to show greeting on new conversation
-    st.session_state.query = None  # Reset query
+    st.session_state.show_greeting = True
+    st.session_state.query = None
+    st.session_state.show_history = False  # Reset history toggle
     st.rerun()
 
 def init_service_metadata():
@@ -263,6 +265,14 @@ def create_prompt(user_question):
         Answer:
     """
     return complete(st.session_state.model_name, prompt)
+
+def get_user_questions(limit=10):
+    """
+    Extract the last 'limit' user questions from the chat history.
+    Returns a list of questions in reverse chronological order (most recent first).
+    """
+    user_questions = [msg["content"] for msg in st.session_state.chat_history if msg["role"] == "user"]
+    return user_questions[-limit:][::-1]  # Last 'limit' questions, reversed to show most recent first
 
 if not st.session_state.authenticated:
     st.title("Welcome to Snowflake Cortex AI")
@@ -535,16 +545,23 @@ else:
 
     def toggle_about():
         st.session_state.show_about = not st.session_state.show_about
-        st.session_state.show_help = False  # Close the other section if open
+        st.session_state.show_help = False
+        st.session_state.show_history = False  # Close history if open
 
     def toggle_help():
         st.session_state.show_help = not st.session_state.show_help
-        st.session_state.show_about = False  # Close the other section if open
+        st.session_state.show_about = False
+        st.session_state.show_history = False  # Close history if open
+
+    def toggle_history():
+        st.session_state.show_history = not st.session_state.show_history
+        st.session_state.show_about = False  # Close about if open
+        st.session_state.show_help = False  # Close help if open
 
     with st.sidebar:
         st.markdown("""
         <style>
-        /* Default styling for sidebar buttons (suggested questions, Clear conversation, etc.) */
+        /* Default styling for sidebar buttons (suggested questions, Clear conversation, history questions, etc.) */
         [data-testid="stSidebar"] [data-testid="stButton"] > button {
             background-color: #29B5E8 !important;
             color: white !important;
@@ -555,9 +572,10 @@ else:
             border: none !important;
             padding: 0.5rem 1rem !important;
         }
-        /* Custom styling for About and Help & Documentation buttons */
+        /* Custom styling for About, Help & Documentation, and History buttons */
         [data-testid="stSidebar"] [data-testid="stButton"][aria-label="About"] > button,
-        [data-testid="stSidebar"] [data-testid="stButton"][aria-label="Help & Documentation"] > button {
+        [data-testid="stSidebar"] [data-testid="stButton"][aria-label="Help & Documentation"] > button,
+        [data-testid="stSidebar"] [data-testid="stButton"][aria-label="History"] > button {
             background-color: #D3D3D3 !important;
             color: #000000 !important;
             font-weight: normal !important;
@@ -594,6 +612,20 @@ else:
             if st.button(sample, key=f"sidebar_{sample}"):
                 st.session_state.query = sample
                 st.session_state.show_greeting = False
+
+        # Add History button
+        if st.button("History", key="history_button"):
+            toggle_history()
+        if st.session_state.show_history:
+            st.markdown("### Recent Questions")
+            user_questions = get_user_questions(limit=10)
+            if not user_questions:
+                st.write("No questions in history yet.")
+            else:
+                for question in user_questions:
+                    if st.button(question, key=f"history_{question}"):
+                        st.session_state.query = question
+                        st.session_state.show_greeting = False
 
         # Add About and Help & Documentation buttons
         if st.button("About", key="about_button"):
@@ -644,7 +676,7 @@ else:
     if chat_input_query:
         st.session_state.query = chat_input_query
 
-    # Process the query (either from chat input or a clicked button)
+    # Process the query (either from chat input, a clicked sample question, or a history question)
     if st.session_state.query:
         query = st.session_state.query
         if query.lower().startswith("no of"):
