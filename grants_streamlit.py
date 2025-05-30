@@ -1,3 +1,4 @@
+```python
 import streamlit as st
 import json
 import re
@@ -34,7 +35,7 @@ if "authenticated" not in st.session_state:
     st.session_state.CONN = None
     st.session_state.snowpark_session = None
     st.session_state.chat_history = []
-    st.session_state.data_source = "Database"  # NEW: Initialize data source
+    st.session_state.data_source = "Database"  # Initialize data source
 if "debug_mode" not in st.session_state:
     st.session_state.debug_mode = False
 if "chart_x_axis" not in st.session_state:
@@ -54,7 +55,7 @@ if "current_summary" not in st.session_state:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "suggested_question_selected" not in st.session_state:
-    st.session_state.suggested_question_selected = None  # To store the selected suggested question
+    st.session_state.suggested_question_selected = None
 
 # Hide Streamlit branding and prevent chat history shading
 st.markdown("""
@@ -215,13 +216,9 @@ else:
             "messages": [{"role": "user", "content": [{"type": "text", "text": query}]}],
             "tools": []
         }
-        # Use cortex_search for Document queries or when SEMANTIC_MODEL is unavailable
         if st.session_state.data_source == "Document" or is_structured:
             payload["tools"].append({"tool_spec": {"type": "cortex_search", "name": "search1"}})
             payload["tool_resources"] = {"search1": {"name": CORTEX_SEARCH_SERVICES, "max_results": 1}}
-        # For Database queries, add semantic model logic here when available
-        # Example: payload["tools"].append({"tool_spec": {"type": "semantic_model", "name": SEMANTIC_MODEL}})
-
         try:
             resp = requests.post(
                 url=f"https://{HOST}{API_ENDPOINT}",
@@ -275,11 +272,9 @@ else:
             st.error(f"❌ Error Processing Response: {str(e)}")
         return sql.strip(), search_results
 
-    # Visualization Function
     def display_chart_tab(df: pd.DataFrame, prefix: str = "chart", query: str = ""):
         if df.empty or len(df.columns) < 2:
             return
-
         query_lower = query.lower()
         if re.search(r'\b(county|jurisdiction)\b', query_lower):
             default_chart = "Pie Chart"
@@ -287,17 +282,14 @@ else:
             default_chart = "Line Chart"
         else:
             default_chart = "Bar Chart"
-
         all_cols = list(df.columns)
         col1, col2, col3 = st.columns(3)
-
         default_x = st.session_state.get(f"{prefix}_x", all_cols[0])
         try:
             x_index = all_cols.index(default_x)
         except ValueError:
             x_index = 0
         x_col = col1.selectbox("X axis", all_cols, index=x_index, key=f"{prefix}_x")
-
         remaining_cols = [c for c in all_cols if c != x_col]
         default_y = st.session_state.get(f"{prefix}_y", remaining_cols[0])
         try:
@@ -305,7 +297,6 @@ else:
         except ValueError:
             y_index = 0
         y_col = col2.selectbox("Y axis", remaining_cols, index=y_index, key=f"{prefix}_y")
-
         chart_options = ["Line Chart", "Bar Chart", "Pie Chart", "Scatter Chart", "Histogram Chart"]
         default_type = st.session_state.get(f"{prefix}_type", default_chart)
         try:
@@ -313,7 +304,6 @@ else:
         except ValueError:
             type_index = chart_options.index(default_chart)
         chart_type = col3.selectbox("Chart Type", chart_options, index=type_index, key=f"{prefix}_type")
-
         if chart_type == "Line Chart":
             fig = px.line(df, x=x_col, y=y_col, title=chart_type)
             st.plotly_chart(fig, key=f"{prefix}_line")
@@ -363,12 +353,17 @@ else:
                 start_new_conversation()
 
         with data_source_container:
-            st.session_state.data_source = st.radio(
+            # Use st.radio and assign its value to session state
+            data_source = st.radio(
                 "Select Data Source:",
                 ["Database", "Document"],
+                index=0 if st.session_state.data_source == "Database" else 1,
                 key="data_source",
                 help="Choose 'Database' for structured queries or 'Document' for document-based queries."
             )
+            # Update session state only if the value changes
+            if data_source != st.session_state.data_source:
+                st.session_state.data_source = data_source
 
         with about_container:
             st.markdown("### About")
@@ -408,7 +403,6 @@ else:
                     st.markdown("**📈 Visualization:**")
                     display_chart_tab(message["results"], prefix=f"chart_{hash(message['content'])}", query=message.get("query", ""))
 
-            # Display suggested questions as buttons if the query wasn't understood
             if message["role"] == "assistant" and not message.get("understood_query", True):
                 st.markdown("**I’m sorry, I didn’t understand your question. Here are some suggested questions you can try:**")
                 for idx, suggestion in enumerate(sample_questions):
@@ -430,18 +424,14 @@ else:
         if st.sidebar.button(sample, key=sample):
             query = sample
 
-    # Check if a suggested question was selected
     if st.session_state.suggested_question_selected:
         query = st.session_state.suggested_question_selected
-        st.session_state.suggested_question_selected = None  # Clear after processing
+        st.session_state.suggested_question_selected = None
 
     if query:
-        # Reset chart selections for new query
         st.session_state.chart_x_axis = None
         st.session_state.chart_y_axis = None
         st.session_state.chart_type = "Bar Chart"
-
-        # Add user query to chat history and messages
         st.session_state.chat_history.append({"role": "user", "content": query})
         st.session_state.messages.append({"role": "user", "content": query})
         with st.chat_message("user"):
@@ -454,8 +444,6 @@ else:
                 is_summarize = is_summarize_query(query)
                 is_suggestion = is_question_suggestion_query(query)
                 is_greeting = is_greeting_query(query)
-
-                # Flag to track if the query was understood
                 understood_query = False
                 assistant_response = {"role": "assistant", "content": "", "query": query}
 
@@ -566,18 +554,14 @@ else:
                         st.warning(response_content)
                         assistant_response["content"] = response_content
 
-                # Add the understood_query flag to the assistant response
                 assistant_response["understood_query"] = understood_query
-
-                # Add assistant response to chat history and messages
                 st.session_state.chat_history.append(assistant_response)
                 st.session_state.messages.append(assistant_response)
-                # Update current query and results
                 st.session_state.current_query = query
                 st.session_state.current_results = assistant_response.get("results")
                 st.session_state.current_sql = assistant_response.get("sql")
                 st.session_state.current_summary = assistant_response.get("summary")
 
-    # Display welcome message under the title only if no queries have been made
     if not st.session_state.messages:
         st.markdown("💡 **Welcome! I’m the Snowflake Cortex AI Assistant, ready to assist you with grant data analysis — simply type your question to get started**")
+```
