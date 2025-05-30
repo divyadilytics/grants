@@ -1,4 +1,3 @@
-```python
 import streamlit as st
 import json
 import re
@@ -106,7 +105,7 @@ st.markdown("""
 .chat-container {
     max-width: 800px;
     margin: 0 auto;
-    padding: 10px 10px 80px 10px; /* Extra padding at the bottom to avoid overlap with fixed input */
+    padding: 10px 10px 100px 10px; /* Extra padding at the bottom to avoid overlap with fixed input */
     min-height: calc(100vh - 200px);
     overflow-y: auto;
 }
@@ -131,26 +130,30 @@ st.markdown("""
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 .chat-input-container {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 10px;
-    background-color: white;
-    border-top: 1px solid #ccc;
-    box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
-    z-index: 1000;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    max-width: 800px !important;
+    width: calc(100% - 40px) !important;
+    padding: 10px !important;
+    background-color: white !important;
+    border-top: 1px solid #ccc !important;
+    box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1) !important;
+    z-index: 1000 !important;
+}
+.chat-input-container > div {
+    width: 100% !important;
 }
 [data-testid="stChatInput"] {
     background-color: white !important;
     border-radius: 10px !important;
     padding: 5px 10px !important;
     border: 1px solid #ccc !important;
+    width: 100% !important;
 }
 body {
-    padding-bottom: 80px; /* Ensure body has padding to avoid content being hidden under fixed input */
+    padding-bottom: 100px !important; /* Ensure body has padding to avoid content being hidden under fixed input */
 }
 </style>
 """, unsafe_allow_html=True)
@@ -913,4 +916,3 @@ else:
                 st.session_state.current_sql = assistant_response.get("sql")
                 st.session_state.current_summary = assistant_response.get("summary")
             st.markdown('</div>', unsafe_allow_html=True)
-```
