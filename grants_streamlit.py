@@ -1,3 +1,4 @@
+```python
 import streamlit as st
 import json
 import re
@@ -78,11 +79,10 @@ if "clear_conversation" not in st.session_state:
     st.session_state.clear_conversation = False
 if "show_selector" not in st.session_state:
     st.session_state.show_selector = False
-# NEW: Initialize show_greeting and data_source
 if "show_greeting" not in st.session_state:
     st.session_state.show_greeting = True
 if "data_source" not in st.session_state:
-    st.session_state.data_source = "Database"  # Default to Database
+    st.session_state.data_source = "Database"
 
 # Hide Streamlit branding and prevent chat history shading
 st.markdown("""
@@ -91,6 +91,19 @@ st.markdown("""
 [data-testid="stChatMessage"] {
     opacity: 1 !important;
     background-color: transparent !important;
+}
+.welcome-message {
+    background-color: #29B5E8;
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    text-align: center;
+    margin: 20px 0;
+    animation: fadeIn 1s ease-in;
+}
+@keyframes fadeIn {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -112,7 +125,7 @@ def start_new_conversation():
     st.session_state.chart_type = "Bar Chart"
     st.session_state.last_suggestions = []
     st.session_state.clear_conversation = False
-    st.session_state.show_greeting = False
+    st.session_state.show_greeting = True
     st.rerun()
 
 def init_service_metadata():
@@ -542,16 +555,25 @@ else:
         </style>
         """, unsafe_allow_html=True)
         logo_container = st.container()
-        button_container = st.container()
+        config_container = st.container()
+        data_source_container = st.container()
         about_container = st.container()
         help_container = st.container()
         with logo_container:
             logo_url = "https://www.snowflake.com/wp-content/themes/snowflake/assets/img/logo-blue.svg"
             st.image(logo_url, width=250)
-        with button_container:
+        with config_container:
             init_config_options()
-            # NEW: Button to select data source
-            st.radio("Select Data Source:", ["Database", "Document"], key="data_source")
+        with data_source_container:
+            data_source = st.radio(
+                "Select Data Source:",
+                ["Database", "Document"],
+                index=0 if st.session_state.data_source == "Database" else 1,
+                key="data_source",
+                help="Choose 'Database' for structured queries or 'Document' for document-based queries."
+            )
+            if data_source != st.session_state.data_source:
+                st.session_state.data_source = data_source
         with about_container:
             st.markdown("### About")
             st.write(
@@ -572,20 +594,20 @@ else:
     st.markdown(f"Semantic Model: `{semantic_model_filename}`")
     init_service_metadata()
 
-    # NEW: Display default greeting message if no interaction has occurred
+    # Display welcome message if no interaction has occurred
     if st.session_state.show_greeting and not st.session_state.chat_history:
         st.markdown("""
-        **Welcome to the Cortex AI Assistant!**  
-        Ask questions about property management, such as occupancy rates, lease details, or tenant payments, and get insights from your data.  
-        Try a sample question from the sidebar or type your own below!
-        """)
-    else:
-        st.session_state.show_greeting = False
+        <div class="welcome-message">
+            <h2>Welcome to the Cortex AI Assistant!</h2>
+            <p>Explore your property management data with ease. Ask about occupancy rates, lease details, tenant payments, or supplier metrics to uncover actionable insights.</p>
+            <p><strong>Get started:</strong> Type a question below or select a sample question from the sidebar!</p>
+        </div>
+        """, unsafe_allow_html=True)
 
     st.sidebar.subheader("Sample Questions")
     sample_questions = [
         "What is Property Management",
-        "total number of properties currently occupied?",
+        "Total number of properties currently occupied?",
         "What is the number of properties by occupancy status?",
         "What is the number of properties currently leased?",
         "What are the supplier payments compared to customer billing by month?",
@@ -613,13 +635,13 @@ else:
     query = st.chat_input("Ask your question...")
     if query and query.lower().startswith("no of"):
         query = query.replace("no of", "number of", 1)
-    for sample in sample_questions:
-        if st.sidebar.button(sample, key=sample):
+    for idx, sample in enumerate(sample_questions):
+        if st.sidebar.button(sample, key=f"sample_question_{idx}"):
             query = sample
-            st.session_state.show_greeting = False  # Hide greeting on sample question click
+            st.session_state.show_greeting = False
 
     if query:
-        st.session_state.show_greeting = False  # Hide greeting on query submission
+        st.session_state.show_greeting = False
         st.session_state.chart_x_axis = None
         st.session_state.chart_y_axis = None
         st.session_state.chart_type = "Bar Chart"
@@ -649,11 +671,11 @@ else:
                 response_content = ""
                 failed_response = False
 
-                # NEW: Modified greeting response for "hi"
                 if is_greeting and original_query.lower().strip() == "hi":
                     response_content = """
-                    Hi! How can I help you?  
-                    The **Property Management module** enables you to analyze data related to properties, leases, tenants, rent, and occupancy metrics. Ask about occupancy rates, lease terms, tenant payments, or supplier details to get started!
+                    Hi! Welcome to the Cortex AI Assistant!  
+                    Dive into your property management data to analyze occupancy rates, lease terms, tenant payments, or supplier metrics.  
+                    Try a sample question from the sidebar or ask your own to get started!
                     """
                     with response_placeholder:
                         st.write_stream(stream_text(response_content))
@@ -666,11 +688,11 @@ else:
                     greeting = original_query.lower().split()[0]
                     if greeting not in ["hi", "hello", "hey", "greet"]:
                         greeting = "hello"
-                    response_content = f"{greeting}! I'm here to help with your procurement analytics questions. Here are some questions you can ask me:\n\n"
+                    response_content = f"{greeting.title()}! I'm here to help with your property management analytics questions. Here are some questions you can ask me:\n\n"
                     selected_questions = sample_questions[:5]
                     for i, q in enumerate(selected_questions, 1):
                         response_content += f"{i}. {q}\n"
-                    response_content += "\nFeel free to ask any of these or come up with your own related to procurement analytics!"
+                    response_content += "\nFeel free to ask any of these or come up with your own related to property management analytics!"
                     with response_placeholder:
                         st.write_stream(stream_text(response_content))
                         st.markdown(response_content, unsafe_allow_html=True)
@@ -803,3 +825,4 @@ else:
                 st.session_state.current_results = assistant_response.get("results")
                 st.session_state.current_sql = assistant_response.get("sql")
                 st.session_state.current_summary = assistant_response.get("summary")
+```
