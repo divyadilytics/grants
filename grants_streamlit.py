@@ -1,3 +1,4 @@
+```python
 import streamlit as st
 import json
 import re
@@ -105,7 +106,9 @@ st.markdown("""
 .chat-container {
     max-width: 800px;
     margin: 0 auto;
-    padding: 10px;
+    padding: 10px 10px 80px 10px; /* Extra padding at the bottom to avoid overlap with fixed input */
+    min-height: calc(100vh - 200px);
+    overflow-y: auto;
 }
 .chat-message-user {
     background-color: #29B5E8;
@@ -128,17 +131,26 @@ st.markdown("""
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 .chat-input-container {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
     max-width: 800px;
-    margin: 20px auto;
+    margin: 0 auto;
     padding: 10px;
-    border: 1px solid #ccc;
-    border-radius: 10px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    background-color: white;
+    border-top: 1px solid #ccc;
+    box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
 }
 [data-testid="stChatInput"] {
     background-color: white !important;
     border-radius: 10px !important;
     padding: 5px 10px !important;
+    border: 1px solid #ccc !important;
+}
+body {
+    padding-bottom: 80px; /* Ensure body has padding to avoid content being hidden under fixed input */
 }
 </style>
 """, unsafe_allow_html=True)
@@ -624,12 +636,13 @@ else:
                 "- [Contact Support](https://www.snowflake.com/en/support/)"
             )
 
+    # Main content area
     st.title("Cortex AI Assistant by DiLytics")
     semantic_model_filename = SEMANTIC_MODEL.split("/")[-1]
     st.markdown(f"Semantic Model: `{semantic_model_filename}`")
     init_service_metadata()
 
-    # Display welcome message if no interaction has occurred
+    # Welcome message
     if st.session_state.show_greeting and not st.session_state.chat_history:
         st.markdown("""
         <div class="welcome-message">
@@ -639,6 +652,7 @@ else:
         </div>
         """, unsafe_allow_html=True)
 
+    # Sidebar sample questions
     st.sidebar.subheader("Sample Questions")
     sample_questions = [
         "What is Property Management",
@@ -655,7 +669,7 @@ else:
         "What are the details of supplier payments?",
     ]
 
-    # Chat history container
+    # Chat history container (scrollable)
     with st.container():
         st.markdown('<div class="chat-container">', unsafe_allow_html=True)
         for message in st.session_state.chat_history:
@@ -679,7 +693,7 @@ else:
                         display_chart_tab(message["results"], prefix=f"chart_{hash(message['content'])}", query=message.get("query", ""))
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # Chat input container
+    # Chat input container (fixed at bottom)
     with st.container():
         st.markdown('<div class="chat-input-container">', unsafe_allow_html=True)
         query = st.chat_input("Ask your question...")
@@ -899,3 +913,4 @@ else:
                 st.session_state.current_sql = assistant_response.get("sql")
                 st.session_state.current_summary = assistant_response.get("summary")
             st.markdown('</div>', unsafe_allow_html=True)
+```
