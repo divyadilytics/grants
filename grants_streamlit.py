@@ -105,8 +105,8 @@ st.markdown("""
 .chat-container {
     max-width: 800px;
     margin: 0 auto;
-    padding: 10px 10px 100px 10px; /* Extra padding at the bottom to avoid overlap with fixed input */
-    min-height: calc(100vh - 200px);
+    padding: 10px 10px 70px 10px; /* Adjusted padding to minimize space */
+    min-height: calc(100vh - 150px);
     overflow-y: auto;
 }
 .chat-message-user {
@@ -136,7 +136,8 @@ st.markdown("""
     transform: translateX(-50%) !important;
     max-width: 800px !important;
     width: calc(100% - 40px) !important;
-    padding: 10px !important;
+    padding: 5px !important; /* Reduced padding to minimize space */
+    margin: 0 !important; /* Remove any margins */
     background-color: white !important;
     border-top: 1px solid #ccc !important;
     box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1) !important;
@@ -144,6 +145,7 @@ st.markdown("""
 }
 .chat-input-container > div {
     width: 100% !important;
+    margin: 0 !important; /* Remove any margins from child elements */
 }
 [data-testid="stChatInput"] {
     background-color: white !important;
@@ -151,9 +153,11 @@ st.markdown("""
     padding: 5px 10px !important;
     border: 1px solid #ccc !important;
     width: 100% !important;
+    margin: 0 !important; /* Remove any margins */
 }
 body {
-    padding-bottom: 100px !important; /* Ensure body has padding to avoid content being hidden under fixed input */
+    padding-bottom: 60px !important; /* Reduced padding to match chat input height */
+    margin: 0 !important; /* Remove any default body margins */
 }
 </style>
 """, unsafe_allow_html=True)
