@@ -1,4 +1,3 @@
-```python
 import streamlit as st
 import json
 import re
@@ -564,4 +563,4 @@ else:
 
     if not st.session_state.messages:
         st.markdown("💡 **Welcome! I’m the Snowflake Cortex AI Assistant, ready to assist you with grant data analysis — simply type your question to get started**")
-```
+
