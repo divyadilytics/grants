@@ -86,8 +86,7 @@ if "show_about" not in st.session_state:
     st.session_state.show_about = False
 if "show_help" not in st.session_state:
     st.session_state.show_help = False
-if "show_history" not in st.session_state:
-    st.session_state.show_history = False
+# Add session state for query to persist across reruns
 if "query" not in st.session_state:
     st.session_state.query = None
 
@@ -119,9 +118,8 @@ def start_new_conversation():
     st.session_state.chart_type = "Bar Chart"
     st.session_state.last_suggestions = []
     st.session_state.clear_conversation = False
-    st.session_state.show_greeting = True
-    st.session_state.query = None
-    st.session_state.show_history = False  # Reset history toggle
+    st.session_state.show_greeting = True  # Reset to show greeting on new conversation
+    st.session_state.query = None  # Reset query
     st.rerun()
 
 def init_service_metadata():
@@ -144,8 +142,32 @@ def init_service_metadata():
             st.session_state.service_metadata = [{"name": CORTEX_SEARCH_SERVICES, "search_column": ""}]
 
 def init_config_options():
-    # This function is now empty as all elements have been moved to the sidebar directly
-    pass
+    st.sidebar.selectbox(
+        "Select cortex search service:",
+        [s["name"] for s in st.session_state.service_metadata] or [CORTEX_SEARCH_SERVICES],
+        key="selected_cortex_search_service"
+    )
+    st.sidebar.button("Clear conversation", on_click=start_new_conversation)
+    st.sidebar.toggle("Debug", key="debug_mode", value=st.session_state.debug_mode)
+    st.sidebar.toggle("Use chat history", key="use_chat_history", value=True)
+    with st.sidebar.expander("Advanced options"):
+        st.selectbox("Select model:", MODELS, key="model_name")
+        st.number_input(
+            "Select number of context chunks",
+            value=100,
+            key="num_retrieved_chunks",
+            min_value=1,
+            max_value=400
+        )
+        st.number_input(
+            "Select number of messages to use in chat history",
+            value=10,
+            key="num_chat_messages",
+            min_value=1,
+            max_value=100
+        )
+    if st.session_state.debug_mode:
+        st.sidebar.expander("Session State").write(st.session_state)
 
 def query_cortex_search_service(query):
     try:
@@ -241,14 +263,6 @@ def create_prompt(user_question):
         Answer:
     """
     return complete(st.session_state.model_name, prompt)
-
-def get_user_questions(limit=10):
-    """
-    Extract the last 'limit' user questions from the chat history.
-    Returns a list of questions in reverse chronological order (most recent first).
-    """
-    user_questions = [msg["content"] for msg in st.session_state.chat_history if msg["role"] == "user"]
-    return user_questions[-limit:][::-1]  # Last 'limit' questions, reversed to show most recent first
 
 if not st.session_state.authenticated:
     st.title("Welcome to Snowflake Cortex AI")
@@ -521,23 +535,16 @@ else:
 
     def toggle_about():
         st.session_state.show_about = not st.session_state.show_about
-        st.session_state.show_help = False
-        st.session_state.show_history = False  # Close history if open
+        st.session_state.show_help = False  # Close the other section if open
 
     def toggle_help():
         st.session_state.show_help = not st.session_state.show_help
-        st.session_state.show_about = False
-        st.session_state.show_history = False  # Close history if open
-
-    def toggle_history():
-        st.session_state.show_history = not st.session_state.show_history
-        st.session_state.show_about = False  # Close about if open
-        st.session_state.show_help = False  # Close help if open
+        st.session_state.show_about = False  # Close the other section if open
 
     with st.sidebar:
         st.markdown("""
         <style>
-        /* Default styling for sidebar buttons (suggested questions) */
+        /* Default styling for sidebar buttons (suggested questions, Clear conversation, etc.) */
         [data-testid="stSidebar"] [data-testid="stButton"] > button {
             background-color: #29B5E8 !important;
             color: white !important;
@@ -548,121 +555,66 @@ else:
             border: none !important;
             padding: 0.5rem 1rem !important;
         }
-        /* Custom styling for Clear conversation, About, Help & Documentation, and History buttons */
-        [data-testid="stSidebar"] [data-testid="stButton"][aria-label="Clear conversation"] > button,
+        /* Custom styling for About and Help & Documentation buttons */
         [data-testid="stSidebar"] [data-testid="stButton"][aria-label="About"] > button,
-        [data-testid="stSidebar"] [data-testid="stButton"][aria-label="Help & Documentation"] > button,
-        [data-testid="stSidebar"] [data-testid="stButton"][aria-label="History"] > button {
-            background-color: #28A745 !important;
-            color: white !important;
+        [data-testid="stSidebar"] [data-testid="stButton"][aria-label="Help & Documentation"] > button {
+            background-color: #D3D3D3 !important;
+            color: #000000 !important;
             font-weight: normal !important;
-            border: 1px solid #28A745 !important;
+            border: 1px solid #000000 !important;
         }
         </style>
         """, unsafe_allow_html=True)
-
-        # Logo
-        logo_url = "https://www.snowflake.com/wp-content/themes/snowflake/assets/img/logo-blue.svg"
-        st.image(logo_url, width=250)
-
-        # First Section: Select Data Source, Config Options, Sample Questions
-        with st.container():
-            # Select Data Source
+        logo_container = st.container()
+        button_container = st.container()
+        with logo_container:
+            logo_url = "https://www.snowflake.com/wp-content/themes/snowflake/assets/img/logo-blue.svg"
+            st.image(logo_url, width=250)
+        with button_container:
+            init_config_options()
             st.radio("Select Data Source:", ["Database", "Document"], key="data_source")
 
-            # Config Options
-            st.selectbox(
-                "Select cortex search service:",
-                [s["name"] for s in st.session_state.service_metadata] or [CORTEX_SEARCH_SERVICES],
-                key="selected_cortex_search_service"
+        st.subheader("Sample Questions")
+        sample_questions = [
+            "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
+            "Give me date wise award breakdowns",
+            "Give me award breakdowns",
+            "Give me date wise award budget, actual award posted, award encumbrance posted, award encumbrance approved",
+            "What is the task actual posted by award name?",
+            "What is the award budget posted by date for these awards?",
+            "What is the total award encumbrance posted for these awards?",
+            "What is the total amount of award encumbrances approved?",
+            "What is the total actual award posted for these awards?",
+            "what is the award budget posted?",
+            "what is this document about",
+            "Subject areas",
+            "explain five layers in High level Architecture"
+        ]
+        for sample in sample_questions:
+            if st.button(sample, key=f"sidebar_{sample}"):
+                st.session_state.query = sample
+                st.session_state.show_greeting = False
+
+        # Add About and Help & Documentation buttons
+        if st.button("About", key="about_button"):
+            toggle_about()
+        if st.session_state.show_about:
+            st.markdown("### About")
+            st.write(
+                "This application uses **Snowflake Cortex Analyst** to interpret "
+                "your natural language questions and generate data insights. "
+                "Simply ask a question below to see relevant answers and visualizations."
             )
-            st.toggle("Debug", key="debug_mode", value=st.session_state.debug_mode)
-            st.toggle("Use chat history", key="use_chat_history", value=True)
-            with st.expander("Advanced options"):
-                st.selectbox("Select model:", MODELS, key="model_name")
-                st.number_input(
-                    "Select number of context chunks",
-                    value=100,
-                    key="num_retrieved_chunks",
-                    min_value=1,
-                    max_value=400
-                )
-                st.number_input(
-                    "Select number of messages to use in chat history",
-                    value=10,
-                    key="num_chat_messages",
-                    min_value=1,
-                    max_value=100
-                )
-            if st.session_state.debug_mode:
-                st.expander("Session State").write(st.session_state)
 
-            # Sample Questions
-            st.subheader("Sample Questions")
-            sample_questions = [
-                "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
-                "Give me date wise award breakdowns",
-                "Give me award breakdowns",
-                "Give me date wise award budget, actual award posted, award encumbrance posted, award encumbrance approved",
-                "What is the task actual posted by award name?",
-                "What is the award budget posted by date for these awards?",
-                "What is the total award encumbrance posted for these awards?",
-                "What is the total amount of award encumbrances approved?",
-                "What is the total actual award posted for these awards?",
-                "what is the award budget posted?",
-                "what is this document about",
-                "Subject areas",
-                "explain five layers in High level Architecture"
-            ]
-            for sample in sample_questions:
-                if st.button(sample, key=f"sidebar_{sample}"):
-                    st.session_state.query = sample
-                    st.session_state.show_greeting = False
-
-        # Divider
-        st.markdown("---")
-
-        # Second Section: Clear conversation, History, About, Help & Documentation
-        with st.container():
-            # Clear conversation button
-            if st.button("Clear conversation", key="clear_conversation_button"):
-                start_new_conversation()
-
-            # History button and content
-            if st.button("History", key="history_button"):
-                toggle_history()
-            if st.session_state.show_history:
-                st.markdown("### Recent Questions")
-                user_questions = get_user_questions(limit=10)
-                if not user_questions:
-                    st.write("No questions in history yet.")
-                else:
-                    for idx, question in enumerate(user_questions):
-                        if st.button(question, key=f"history_{idx}"):
-                            st.session_state.query = question
-                            st.session_state.show_greeting = False
-
-            # About button and content
-            if st.button("About", key="about_button"):
-                toggle_about()
-            if st.session_state.show_about:
-                st.markdown("### About")
-                st.write(
-                    "This application uses **Snowflake Cortex Analyst** to interpret "
-                    "your natural language questions and generate data insights. "
-                    "Simply ask a question below to see relevant answers and visualizations."
-                )
-
-            # Help & Documentation button and content
-            if st.button("Help & Documentation", key="help_button"):
-                toggle_help()
-            if st.session_state.show_help:
-                st.markdown("### Help & Documentation")
-                st.write(
-                    "- [User Guide](https://docs.snowflake.com/en/guides-overview-ai-features)  \n"
-                    "- [Snowflake Cortex Analyst Docs](https://docs.snowflake.com/)  \n"
-                    "- [Contact Support](https://www.snowflake.com/en/support/)"
-                )
+        if st.button("Help & Documentation", key="help_button"):
+            toggle_help()
+        if st.session_state.show_help:
+            st.markdown("### Help & Documentation")
+            st.write(
+                "- [User Guide](https://docs.snowflake.com/en/guides-overview-ai-features)  \n"
+                "- [Snowflake Cortex Analyst Docs](https://docs.snowflake.com/)  \n"
+                "- [Contact Support](https://www.snowflake.com/en/support/)"
+            )
 
     st.title("Cortex AI Assistant by DiLytics")
     semantic_model_filename = SEMANTIC_MODEL.split("/")[-1]
@@ -692,7 +644,7 @@ else:
     if chat_input_query:
         st.session_state.query = chat_input_query
 
-    # Process the query (either from chat input, a clicked sample question, or a history question)
+    # Process the query (either from chat input or a clicked button)
     if st.session_state.query:
         query = st.session_state.query
         if query.lower().startswith("no of"):
