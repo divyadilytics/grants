@@ -576,77 +576,85 @@ else:
         [data-testid="stSidebar"] [data-testid="stButton"][aria-label="About"] > button,
         [data-testid="stSidebar"] [data-testid="stButton"][aria-label="Help & Documentation"] > button,
         [data-testid="stSidebar"] [data-testid="stButton"][aria-label="History"] > button {
-            background-color: #D3D3D3 !important;
-            color: #000000 !important;
+            background-color: #28A745 !important;
+            color: white !important;
             font-weight: normal !important;
-            border: 1px solid #000000 !important;
+            border: 1px solid #28A745 !important;
         }
         </style>
         """, unsafe_allow_html=True)
-        logo_container = st.container()
-        button_container = st.container()
-        with logo_container:
-            logo_url = "https://www.snowflake.com/wp-content/themes/snowflake/assets/img/logo-blue.svg"
-            st.image(logo_url, width=250)
-        with button_container:
-            init_config_options()
-            st.radio("Select Data Source:", ["Database", "Document"], key="data_source")
 
-        st.subheader("Sample Questions")
-        sample_questions = [
-            "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
-            "Give me date wise award breakdowns",
-            "Give me award breakdowns",
-            "Give me date wise award budget, actual award posted, award encumbrance posted, award encumbrance approved",
-            "What is the task actual posted by award name?",
-            "What is the award budget posted by date for these awards?",
-            "What is the total award encumbrance posted for these awards?",
-            "What is the total amount of award encumbrances approved?",
-            "What is the total actual award posted for these awards?",
-            "what is the award budget posted?",
-            "what is this document about",
-            "Subject areas",
-            "explain five layers in High level Architecture"
-        ]
-        for sample in sample_questions:
-            if st.button(sample, key=f"sidebar_{sample}"):
-                st.session_state.query = sample
-                st.session_state.show_greeting = False
+        # Upper Section: Logo, Config Options, Data Source, Sample Questions
+        with st.container():
+            logo_container = st.container()
+            button_container = st.container()
+            with logo_container:
+                logo_url = "https://www.snowflake.com/wp-content/themes/snowflake/assets/img/logo-blue.svg"
+                st.image(logo_url, width=250)
+            with button_container:
+                init_config_options()
+                st.radio("Select Data Source:", ["Database", "Document"], key="data_source")
 
-        # Add History button
-        if st.button("History", key="history_button"):
-            toggle_history()
-        if st.session_state.show_history:
-            st.markdown("### Recent Questions")
-            user_questions = get_user_questions(limit=10)
-            if not user_questions:
-                st.write("No questions in history yet.")
-            else:
-                for idx, question in enumerate(user_questions):
-                    if st.button(question, key=f"history_{idx}"):
-                        st.session_state.query = question
-                        st.session_state.show_greeting = False
+            st.subheader("Sample Questions")
+            sample_questions = [
+                "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
+                "Give me date wise award breakdowns",
+                "Give me award breakdowns",
+                "Give me date wise award budget, actual award posted, award encumbrance posted, award encumbrance approved",
+                "What is the task actual posted by award name?",
+                "What is the award budget posted by date for these awards?",
+                "What is the total award encumbrance posted for these awards?",
+                "What is the total amount of award encumbrances approved?",
+                "What is the total actual award posted for these awards?",
+                "what is the award budget posted?",
+                "what is this document about",
+                "Subject areas",
+                "explain five layers in High level Architecture"
+            ]
+            for sample in sample_questions:
+                if st.button(sample, key=f"sidebar_{sample}"):
+                    st.session_state.query = sample
+                    st.session_state.show_greeting = False
 
-        # Add About and Help & Documentation buttons
-        if st.button("About", key="about_button"):
-            toggle_about()
-        if st.session_state.show_about:
-            st.markdown("### About")
-            st.write(
-                "This application uses **Snowflake Cortex Analyst** to interpret "
-                "your natural language questions and generate data insights. "
-                "Simply ask a question below to see relevant answers and visualizations."
-            )
+        # Divider between sections
+        st.markdown("---")
 
-        if st.button("Help & Documentation", key="help_button"):
-            toggle_help()
-        if st.session_state.show_help:
-            st.markdown("### Help & Documentation")
-            st.write(
-                "- [User Guide](https://docs.snowflake.com/en/guides-overview-ai-features)  \n"
-                "- [Snowflake Cortex Analyst Docs](https://docs.snowflake.com/)  \n"
-                "- [Contact Support](https://www.snowflake.com/en/support/)"
-            )
+        # Lower Section: History, About, Help & Documentation
+        with st.container():
+            # Add History button
+            if st.button("History", key="history_button"):
+                toggle_history()
+            if st.session_state.show_history:
+                st.markdown("### Recent Questions")
+                user_questions = get_user_questions(limit=10)
+                if not user_questions:
+                    st.write("No questions in history yet.")
+                else:
+                    for idx, question in enumerate(user_questions):
+                        if st.button(question, key=f"history_{idx}"):
+                            st.session_state.query = question
+                            st.session_state.show_greeting = False
+
+            # Add About and Help & Documentation buttons
+            if st.button("About", key="about_button"):
+                toggle_about()
+            if st.session_state.show_about:
+                st.markdown("### About")
+                st.write(
+                    "This application uses **Snowflake Cortex Analyst** to interpret "
+                    "your natural language questions and generate data insights. "
+                    "Simply ask a question below to see relevant answers and visualizations."
+                )
+
+            if st.button("Help & Documentation", key="help_button"):
+                toggle_help()
+            if st.session_state.show_help:
+                st.markdown("### Help & Documentation")
+                st.write(
+                    "- [User Guide](https://docs.snowflake.com/en/guides-overview-ai-features)  \n"
+                    "- [Snowflake Cortex Analyst Docs](https://docs.snowflake.com/)  \n"
+                    "- [Contact Support](https://www.snowflake.com/en/support/)"
+                )
 
     st.title("Cortex AI Assistant by DiLytics")
     semantic_model_filename = SEMANTIC_MODEL.split("/")[-1]
