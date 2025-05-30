@@ -578,18 +578,10 @@ else:
 
     st.sidebar.subheader("Sample Questions")
     sample_questions = [
-        "What is Property Management",
-        "total number of properties currently occupied?",
-        "What is the number of properties by occupancy status?",
-        "What is the number of properties currently leased?",
-        "What are the supplier payments compared to customer billing by month?",
-        "What is the total number of suppliers?",
-        "What is the average supplier payment per property?",
-        "What are the details of lease execution, commencement, and termination?",
-        "What are the customer billing and supplier payment details by location and purpose?",
-        "What is the budget recovery by billing purpose?",
-        "What are the details of customer billing?",
-        "What are the details of supplier payments?",
+        "what is the total actual award budget?",
+        "What is the total actual award posted",
+        "What is the total amount of award encumbrances approved",
+        "What is the total task actual posted by award name?"
     ]
 
     for message in st.session_state.chat_history:
@@ -645,8 +637,14 @@ else:
 
                 if is_greeting and original_query.lower().strip() == "hi":
                     response_content = """
-                    Hi! How can I help you?  
-                    The **Property Management module** enables you to analyze data related to properties, leases, tenants, rent, and occupancy metrics. Ask about occupancy rates, lease terms, tenant payments, or supplier details to get started!
+                     "Hi! How can I help you?\n"
+    "The **Property Management module** enables you to analyze data related to properties, leases, tenants, rent, and occupancy metrics. "
+    "Ask about occupancy rates, lease terms, tenant payments, or supplier details to get started!\n\n"
+    "Here are some questions you can try:\n"
+    "- What is the total actual award budget?\n"
+    "- What is the total actual award posted?\n"
+    "- What is the total amount of award encumbrances approved?\n"
+    "- What is the total task actual posted by award name?\n"
                     """
                     with response_placeholder:
                         st.write_stream(stream_text(response_content))
