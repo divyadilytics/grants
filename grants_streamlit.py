@@ -648,10 +648,10 @@ else:
                     response_content = """
                     Hello! Welcome to the GRANTS AI Assistant! I'm here to help you explore and analyze grant-related data, answer questions about awards, budgets, and more, or provide insights from documents.
 
-                    Here are some questions you can try:
+                    Here are some questions you can try:\n
 
-                    What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?
-                    Give me date-wise award breakdowns.
+                    What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?\n
+                    Give me date-wise award breakdowns.\n
                     What is this document about?
                     List all subject areas.
                     Feel free to ask anything, or pick one of the suggested questions to get started!
