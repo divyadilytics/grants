@@ -83,26 +83,62 @@ if "show_greeting" not in st.session_state:
 if "data_source" not in st.session_state:
     st.session_state.data_source = "Database"
 
-# Hide Streamlit branding and prevent chat history shading
+# Custom CSS for styling
 st.markdown("""
 <style>
 #MainMenu, header, footer {visibility: hidden;}
-[data-testid="stChatMessage"] {
-    opacity: 1 !important;
-    background-color: transparent !important;
-}
 .welcome-message {
     background-color: #29B5E8;
     color: white;
     padding: 20px;
     border-radius: 10px;
     text-align: center;
-    margin: 20px 0;
+    margin: 20px auto;
+    max-width: 800px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     animation: fadeIn 1s ease-in;
 }
 @keyframes fadeIn {
     0% { opacity: 0; }
     100% { opacity: 1; }
+}
+.chat-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 10px;
+}
+.chat-message-user {
+    background-color: #29B5E8;
+    color: white;
+    border-radius: 15px;
+    padding: 10px 15px;
+    margin: 10px 0;
+    max-width: 70%;
+    margin-left: auto;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+.chat-message-assistant {
+    background-color: #f0f0f0;
+    color: black;
+    border-radius: 15px;
+    padding: 10px 15px;
+    margin: 10px 0;
+    max-width: 70%;
+    margin-right: auto;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+.chat-input-container {
+    max-width: 800px;
+    margin: 20px auto;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+[data-testid="stChatInput"] {
+    background-color: white !important;
+    border-radius: 10px !important;
+    padding: 5px 10px !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -619,19 +655,36 @@ else:
         "What are the details of supplier payments?",
     ]
 
-    for message in st.session_state.chat_history:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"], unsafe_allow_html=True)
-            if message["role"] == "assistant" and "results" in message and message["results"] is not None:
-                with st.expander("View SQL Query", expanded=False):
-                    st.code(message["sql"], language="sql")
-                st.markdown(f"**Query Results ({len(message['results'])} rows):**")
-                st.dataframe(message["results"])
-                if not message["results"].empty and len(message["results"].columns) >= 2:
-                    st.markdown("**📈 Visualization:**")
-                    display_chart_tab(message["results"], prefix=f"chart_{hash(message['content'])}", query=message.get("query", ""))
+    # Chat history container
+    with st.container():
+        st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+        for message in st.session_state.chat_history:
+            if message["role"] == "user":
+                st.markdown(
+                    f'<div class="chat-message-user">{message["content"]}</div>',
+                    unsafe_allow_html=True
+                )
+            else:
+                st.markdown(
+                    f'<div class="chat-message-assistant">{message["content"]}</div>',
+                    unsafe_allow_html=True
+                )
+                if "results" in message and message["results"] is not None:
+                    with st.expander("View SQL Query", expanded=False):
+                        st.code(message["sql"], language="sql")
+                    st.markdown(f"**Query Results ({len(message['results'])} rows):**")
+                    st.dataframe(message["results"])
+                    if not message["results"].empty and len(message["results"].columns) >= 2:
+                        st.markdown("**📈 Visualization:**")
+                        display_chart_tab(message["results"], prefix=f"chart_{hash(message['content'])}", query=message.get("query", ""))
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    query = st.chat_input("Ask your question...")
+    # Chat input container
+    with st.container():
+        st.markdown('<div class="chat-input-container">', unsafe_allow_html=True)
+        query = st.chat_input("Ask your question...")
+        st.markdown('</div>', unsafe_allow_html=True)
+
     if query and query.lower().startswith("no of"):
         query = query.replace("no of", "number of", 1)
     for idx, sample in enumerate(sample_questions):
@@ -656,9 +709,12 @@ else:
                 query = original_query
         st.session_state.chat_history.append({"role": "user", "content": original_query})
         st.session_state.messages.append({"role": "user", "content": original_query})
-        with st.chat_message("user"):
-            st.markdown(original_query)
-        with st.chat_message("assistant"):
+        with st.container():
+            st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="chat-message-user">{original_query}</div>',
+                unsafe_allow_html=True
+            )
             with st.spinner("Generating Response..."):
                 response_placeholder = st.empty()
                 is_structured = is_structured_query(query) and st.session_state.data_source == "Database"
@@ -677,8 +733,10 @@ else:
                     Try a sample question from the sidebar or ask your own to get started!
                     """
                     with response_placeholder:
-                        st.write_stream(stream_text(response_content))
-                        st.markdown(response_content, unsafe_allow_html=True)
+                        st.markdown(
+                            f'<div class="chat-message-assistant">{response_content}</div>',
+                            unsafe_allow_html=True
+                        )
                     assistant_response["content"] = response_content
                     st.session_state.messages.append({"role": "assistant", "content": response_content})
                     st.session_state.last_suggestions = sample_questions[:5]
@@ -693,8 +751,10 @@ else:
                         response_content += f"{i}. {q}\n"
                     response_content += "\nFeel free to ask any of these or come up with your own related to property management analytics!"
                     with response_placeholder:
-                        st.write_stream(stream_text(response_content))
-                        st.markdown(response_content, unsafe_allow_html=True)
+                        st.markdown(
+                            f'<div class="chat-message-assistant">{response_content}</div>',
+                            unsafe_allow_html=True
+                        )
                     assistant_response["content"] = response_content
                     st.session_state.last_suggestions = selected_questions
                     st.session_state.messages.append({"role": "assistant", "content": response_content})
@@ -704,8 +764,10 @@ else:
                     if response:
                         response_content = f"**✍️ Generated Response:**\n{response}"
                         with response_placeholder:
-                            st.write_stream(stream_text(response_content))
-                            st.markdown(response_content, unsafe_allow_html=True)
+                            st.markdown(
+                                f'<div class="chat-message-assistant">{response_content}</div>',
+                                unsafe_allow_html=True
+                            )
                         assistant_response["content"] = response_content
                         st.session_state.messages.append({"role": "assistant", "content": response_content})
                     else:
@@ -718,8 +780,10 @@ else:
                     if summary:
                         response_content = f"**Summary:**\n{summary}"
                         with response_placeholder:
-                            st.write_stream(stream_text(response_content))
-                            st.markdown(response_content, unsafe_allow_html=True)
+                            st.markdown(
+                                f'<div class="chat-message-assistant">{response_content}</div>',
+                                unsafe_allow_html=True
+                            )
                         assistant_response["content"] = response_content
                         st.session_state.messages.append({"role": "assistant", "content": response_content})
                     else:
@@ -742,8 +806,10 @@ else:
                                 summary = "⚠️ Unable to generate a natural language summary."
                             response_content = f"**✍️ Generated Response:**\n{summary}"
                             with response_placeholder:
-                                st.write_stream(stream_text(response_content))
-                                st.markdown(response_content, unsafe_allow_html=True)
+                                st.markdown(
+                                    f'<div class="chat-message-assistant">{response_content}</div>',
+                                    unsafe_allow_html=True
+                                )
                             with st.expander("View SQL Query", expanded=False):
                                 st.code(sql, language="sql")
                             st.markdown(f"**Query Results ({len(results)} rows):**")
@@ -782,15 +848,19 @@ else:
                         if summary:
                             response_content = f"**Here is the Answer:**\n{summary}"
                             with response_placeholder:
-                                st.write_stream(stream_text(response_content))
-                                st.markdown(response_content, unsafe_allow_html=True)
+                                st.markdown(
+                                    f'<div class="chat-message-assistant">{response_content}</div>',
+                                    unsafe_allow_html=True
+                                )
                             assistant_response["content"] = response_content
                             st.session_state.messages.append({"role": "assistant", "content": response_content})
                         else:
                             response_content = f"**🔍 Key Information (Unsummarized):**\n{summarize_unstructured_answer(raw_result)}"
                             with response_placeholder:
-                                st.write_stream(stream_text(response_content))
-                                st.markdown(response_content, unsafe_allow_html=True)
+                                st.markdown(
+                                    f'<div class="chat-message-assistant">{response_content}</div>',
+                                    unsafe_allow_html=True
+                                )
                             assistant_response["content"] = response_content
                             st.session_state.messages.append({"role": "assistant", "content": response_content})
                     else:
@@ -801,8 +871,10 @@ else:
                 else:
                     response_content = "Please select a data source to proceed with your query."
                     with response_placeholder:
-                        st.write_stream(stream_text(response_content))
-                        st.markdown(response_content, unsafe_allow_html=True)
+                        st.markdown(
+                            f'<div class="chat-message-assistant">{response_content}</div>',
+                            unsafe_allow_html=True
+                        )
                     assistant_response["content"] = response_content
                     st.session_state.messages.append({"role": "assistant", "content": response_content})
 
@@ -813,8 +885,10 @@ else:
                         response_content += f"{i}. {suggestion}\n"
                     response_content += "\nThese questions might help clarify your query. Feel free to try one or rephrase your question!"
                     with response_placeholder:
-                        st.write_stream(stream_text(response_content))
-                        st.markdown(response_content, unsafe_allow_html=True)
+                        st.markdown(
+                            f'<div class="chat-message-assistant">{response_content}</div>',
+                            unsafe_allow_html=True
+                        )
                     assistant_response["content"] = response_content
                     st.session_state.last_suggestions = suggestions
                     st.session_state.messages.append({"role": "assistant", "content": response_content})
@@ -824,3 +898,4 @@ else:
                 st.session_state.current_results = assistant_response.get("results")
                 st.session_state.current_sql = assistant_response.get("sql")
                 st.session_state.current_summary = assistant_response.get("summary")
+            st.markdown('</div>', unsafe_allow_html=True)
