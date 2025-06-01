@@ -16,8 +16,10 @@ DATABASE = "AI"
 SCHEMA = "DWH_MART"
 API_ENDPOINT = "/api/v2/cortex/agent:run"
 API_TIMEOUT = 50000  # in milliseconds
-CORTEX_SEARCH_SERVICES = "AI.DWH_MART.propertymanagement"
-SEMANTIC_MODEL = '@"AI"."DWH_MART"."PROPERTY_MANAGEMENT"/property_management.yaml'
+
+# Single Semantic Model Configuration
+SEMANTIC_MODEL = '@"AI"."DWH_MART"."GRANTS"/grantsyaml_27.yaml'
+CORTEX_SEARCH_SERVICES = "AI.DWH_MART.GRANTS_SEARCH_SERVICES"
 
 # Model options
 MODELS = [
@@ -458,20 +460,36 @@ else:
                 return questions[:5]
             else:
                 return [
-                    "Which properties have the highest occupancy rates?",
-                    "What is the average rent collected per tenant?",
-                    "Which leases expire in the next 30 days?",
-                    "What’s the total rental income by property?",
-                    "Which tenants have pending rent payments?"
+                    "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
+                    "Give me date wise award breakdowns",
+                    "Give me award breakdowns",
+                    "Give me date wise award budget, actual award posted,award encunbrance posted,award encumbrance approved",
+                    "What is the task actual posted by award name?",
+                    "What is the award budget posted by date for these awards?",
+                    "What is the total award encumbrance posted for these awards?",
+                    "What is the total amount of award encumbrances approved?",
+                    "What is the total actual award posted for these awards?",
+                    "what is the award budget posted?",
+                    "what is this document about",
+                    "Subjec areas",
+                    "explain five layers in High level Architecture"
                 ]
         except Exception as e:
             st.error(f"❌ Failed to generate sample questions: {str(e)}")
             return [
-                "Which lease applications are pending?",
-                "What’s the total rental income by property?",
-                "Which tenants have delayed move-ins?",
-                "What’s the average lease approval time?",
-                "Which manager signed the most leases?"
+                 "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
+                 "Give me date wise award breakdowns",
+                 "Give me award breakdowns",
+                 "Give me date wise award budget, actual award posted,award encunbrance posted,award encumbrance approved",
+                 "What is the task actual posted by award name?",
+                 "What is the award budget posted by date for these awards?",
+                 "What is the total award encumbrance posted for these awards?",
+                 "What is the total amount of award encumbrances approved?",
+                 "What is the total actual award posted for these awards?",
+                 "what is the award budget posted?",
+                 "what is this document about",
+                 "Subjec areas",
+                 "explain five layers in High level Architecture"
             ]
 
     def display_chart_tab(df: pd.DataFrame, prefix: str = "chart", query: str = ""):
@@ -672,7 +690,9 @@ else:
     init_service_metadata()
 
     if st.session_state.show_greeting and not st.session_state.chat_history:
-        st.markdown("Welcome! I’m the Snowflake AI Assistant, ready to assist you with Property management. Property management is all about keeping your properties in tip-top shape—leasing, tenant screening, rent collection, and maintenance, with transparency and efficiency. 🏠 Ask about your rent, lease, or submit a maintenance request to get started! — simply type your question to get started.")
+        st.markdown("Welcome! I’m the Snowflake AI Assistant, ready to assist you with grant data analysis, summaries, and answers — simply type your question to get started
+
+")
     else:
         st.session_state.show_greeting = False
 
@@ -733,15 +753,14 @@ else:
 
                 if is_greeting and original_query.lower().strip() == "hi":
                     response_content = """
-                    Hello! Welcome to the Property Management AI Assistant! I'm here to help you explore and analyze property-related data, answer questions about leasing, tenant screening, rent collection, and maintenance, or provide insights from documents.
-
-                    Here are some questions you can try:
-
-                    Total number of properties currently occupied?
-                    What is the number of properties currently leased?
-                    What are the details of lease execution, commencement, and termination?
-                    What is the average supplier payment per property?
-                    Feel free to ask anything, or pick one of the suggested questions to get started!
+                    "Hello! Welcome to the GRANTS AI Assistant! I'm here to help you explore and analyze "
+                     "grant-related data, answer questions about awards, budgets, and more, or provide insights "
+                     "from documents.\n\nHere are some questions you can try:\n"
+                     "1. What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?\n"
+                     "2.Give me date-wise award breakdowns.\n"
+                     "3.What is this document about?\n"
+                     "4.List all subject areas.\n\n"
+                     "Feel free to ask anything, or pick one of the suggested questions to get started!"
                     """
                     with response_placeholder:
                         st.write_stream(stream_text(response_content))
@@ -749,39 +768,53 @@ else:
                     assistant_response["content"] = response_content
                     st.session_state.messages.append({"role": "assistant", "content": response_content})
                     st.session_state.last_suggestions = [
-                        "Total number of properties currently occupied?",
-                        "What is the number of properties currently leased?",
-                        "What are the details of lease execution, commencement, and termination?",
-                        "What is the average supplier payment per property?"
-                    ]
+                         "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
+                         "Give me date wise award breakdowns",
+                         "Give me award breakdowns",
+                         "Give me date wise award budget, actual award posted,award encunbrance posted,award encumbrance approved",
+                         "What is the task actual posted by award name?",
+                         "What is the award budget posted by date for these awards?",
+                         "What is the total award encumbrance posted for these awards?",
+                         "What is the total amount of award encumbrances approved?",
+                         "What is the total actual award posted for these awards?",
+                         "what is the award budget posted?",
+                         "what is this document about",
+                         "Subjec areas",
+                         "explain five layers in High level Architecture"
+                        ]
 
                 elif is_greeting or is_suggestion:
                     greeting = original_query.lower().split()[0]
                     if greeting not in ["hi", "hello", "hey", "greet"]:
                         greeting = "hello"
                     response_content = (
-                        f"Hello! Welcome to the Property Management AI Assistant! I'm here to help you explore and analyze property-related data, answer questions about leasing, tenant screening, rent collection, and maintenance, or provide insights from documents.\n\n"
-                        "Here are some types of information you can get from me:\n\n"
-                        "1. **Property Metrics**: Information on occupancy rates, number of properties leased, or total rental income by property.\n"
-                        "2. **Lease Details**: Insights into lease execution, commencement, and termination dates.\n"
-                        "3. **Tenant Information**: Details on tenant screening, pending rent payments, or tenant move-ins.\n"
-                        "4. **Financial Insights**: Data on supplier payments, customer billing, budget recovery, or average payments per property.\n"
-                        "5. **Maintenance Requests**: Information on submitting or tracking maintenance requests.\n\n"
-                        "Feel free to ask anything, or try one of these sample questions:\n"
-                        "- Total number of properties currently occupied?\n"
-                        "- What are the details of lease execution, commencement, and termination?\n"
-                        "- What is the average supplier payment per property?\n"
-                        "- Which tenants have pending rent payments?"
-                    )
+                        f "Hello! Welcome to the GRANTS AI Assistant! I'm here to help you explore and analyze "
+                          "grant-related data, answer questions about awards, budgets, and more, or provide insights "
+                          "from documents.\n\nHere are some questions you can try:\n"
+                          "   1. What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?\n"
+                          "   2.Give me date-wise award breakdowns.\n"
+                          "   3.What is this document about?\n"
+                          "   4.List all subject areas.\n\n"
+                         "Feel free to ask anything, or pick one of the suggested questions to get started!"
+            )
                     with response_placeholder:
                         st.write_stream(stream_text(response_content))
                         st.markdown(response_content, unsafe_allow_html=True)
                     assistant_response["content"] = response_content
                     st.session_state.last_suggestions = [
-                        "Total number of properties currently occupied?",
-                        "What are the details of lease execution, commencement, and termination?",
-                        "What is the average supplier payment per property?",
-                        "Which tenants have pending rent payments?"
+                         "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
+                         "Give me date wise award breakdowns",
+                         "Give me award breakdowns",
+                         "Give me date wise award budget, actual award posted,award encunbrance posted,award encumbrance approved",
+                         "What is the task actual posted by award name?",
+                         "What is the award budget posted by date for these awards?",
+                         "What is the total award encumbrance posted for these awards?",
+                         "What is the total amount of award encumbrances approved?",
+                         "What is the total actual award posted for these awards?",
+                         "what is the award budget posted?",
+                         "what is this document about",
+                         "Subjec areas",
+                         "explain five layers in High level Architecture"
                     ]
                     st.session_state.messages.append({"role": "assistant", "content": response_content})
 
