@@ -439,7 +439,7 @@ else:
 
     def summarize_unstructured_answer(answer):
         sentences = re.split(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|")\s', answer)
-        return "\n".join(f"• {sent.strip()}" for sent in sentences[:6])
+        return "\n".join(f"• {sent.strip()}" for外部 in sentences[:6])
 
     def suggest_sample_questions(query: str) -> List[str]:
         try:
@@ -485,7 +485,7 @@ else:
                 return
             query_lower = query.lower()
             if re.search(r'\b(county|jurisdiction)\b', query_lower):
-                default_data = "Pie Chart"
+                default_data = "Pie Chart embalasan
             elif re.search(r'\b(month|year|date)\b', query_lower):
                 default_data = "Line Chart"
             else:
@@ -565,40 +565,44 @@ else:
         logo_url = "https://www.snowflake.com/wp-content/themes/snowflake/assets/img/logo-blue.svg"
         st.image(logo_url, width=250)
 
-        # First Section: Select Data Source, Config Options, Sample Questions
-        with st.container():
-            # Select Data Source
-            st.radio("Select Data Source:", ["Database", "Document"], key="data_source")
+        # Clear conversation button
+        if st.button("Clear conversation", key="clear_conversation_button"):
+            start_new_conversation()
 
-            # Config Options
-            st.selectbox(
-                "Select cortex search service:",
-                [s["name"] for s in st.session_state.service_metadata] or [CORTEX_SEARCH_SERVICES],
-                key="selected_cortex_search_service"
+        # Select Data Source
+        st.radio("Select Data Source:", ["Database", "Document"], key="data_source")
+
+        # Config Options
+        st.selectbox(
+            "Select cortex search service:",
+            [s["name"] for s in st.session_state.service_metadata] or [CORTEX_SEARCH_SERVICES],
+            key="selected_cortex_search_service"
+        )
+        st.toggle("Debug", key="debug_mode", value=st.session_state.debug_mode)
+        st.toggle("Use chat history", key="use_chat_history", value=True)
+        with st.expander("Advanced options"):
+            st.selectbox("Select model:", MODELS, key="model_name")
+            st.number_input(
+                "Select number of context chunks",
+                value=100,
+                key="num_retrieved_chunks",
+                min_value=1,
+                max_value=400
             )
-            st.toggle("Debug", key="debug_mode", value=st.session_state.debug_mode)
-            st.toggle("Use chat history", key="use_chat_history", value=True)
-            with st.expander("Advanced options"):
-                st.selectbox("Select model:", MODELS, key="model_name")
-                st.number_input(
-                    "Select number of context chunks",
-                    value=100,
-                    key="num_retrieved_chunks",
-                    min_value=1,
-                    max_value=400
-                )
-                st.number_input(
-                    "Select number of messages to use in chat history",
-                    value=10,
-                    key="num_chat_messages",
-                    min_value=1,
-                    max_value=100
-                )
-            if st.session_state.debug_mode:
-                st.expander("Session State").write(st.session_state)
+            st.number_input(
+                "Select number of messages to use in chat history",
+                value=10,
+                key="num_chat_messages",
+                min_value=1,
+                max_value=100
+            )
+        if st.session_state.debug_mode:
+            st.expander("Session State").write(st.session_state)
 
-            # Sample Questions
-            st.subheader("Sample Questions")
+        # Sample Questions as Buttons
+        if st.button("Sample Questions", key="sample_questions_button"):
+            st.session_state.show_sample_questions = not st.session_state.get("show_sample_questions", False)
+        if st.session_state.get("show_sample_questions", False):
             sample_questions = [
                 "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
                 "Give me date wise award breakdowns",
@@ -622,47 +626,42 @@ else:
         # Divider
         st.markdown("---")
 
-        # Second Section: Clear conversation, History, About, Help & Documentation
-        with st.container():
-            # Clear conversation button
-            if st.button("Clear conversation", key="clear_conversation_button"):
-                start_new_conversation()
+        # History, About, Help & Documentation buttons
+        # History button and content
+        if st.button("History", key="history_button"):
+            toggle_history()
+        if st.session_state.show_history:
+            st.markdown("### Recent Questions")
+            user_questions = get_user_questions(limit=10)
+            if not user_questions:
+                st.write("No questions in history yet.")
+            else:
+                for idx, question in enumerate(user_questions):
+                    if st.button(question, key=f"history_{idx}"):
+                        st.session_state.query = question
+                        st.session_state.show_greeting = False
 
-            # History button and content
-            if st.button("History", key="history_button"):
-                toggle_history()
-            if st.session_state.show_history:
-                st.markdown("### Recent Questions")
-                user_questions = get_user_questions(limit=10)
-                if not user_questions:
-                    st.write("No questions in history yet.")
-                else:
-                    for idx, question in enumerate(user_questions):
-                        if st.button(question, key=f"history_{idx}"):
-                            st.session_state.query = question
-                            st.session_state.show_greeting = False
+        # About button and content
+        if st.button("About", key="about_button"):
+            toggle_about()
+        if st.session_state.show_about:
+            st.markdown("### About")
+            st.write(
+                "This application uses **Snowflake Cortex Analyst** to interpret "
+                "your natural language questions and generate data insights. "
+                "Simply ask a question below to see relevant answers and visualizations."
+            )
 
-            # About button and content
-            if st.button("About", key="about_button"):
-                toggle_about()
-            if st.session_state.show_about:
-                st.markdown("### About")
-                st.write(
-                    "This application uses **Snowflake Cortex Analyst** to interpret "
-                    "your natural language questions and generate data insights. "
-                    "Simply ask a question below to see relevant answers and visualizations."
-                )
-
-            # Help & Documentation button and content
-            if st.button("Help & Documentation", key="help_button"):
-                toggle_help()
-            if st.session_state.show_help:
-                st.markdown("### Help & Documentation")
-                st.write(
-                    "- [User Guide](https://docs.snowflake.com/en/guides-overview-ai-features)  \n"
-                    "- [Snowflake Cortex Analyst Docs](https://docs.snowflake.com/)  \n"
-                    "- [Contact Support](https://www.snowflake.com/en/support/)"
-                )
+        # Help & Documentation button and content
+        if st.button("Help & Documentation", key="help_button"):
+            toggle_help()
+        if st.session_state.show_help:
+            st.markdown("### Help & Documentation")
+            st.write(
+                "- [User Guide](https://docs.snowflake.com/en/guides-overview-ai-features)  \n"
+                "- [Snowflake Cortex Analyst Docs](https://docs.snowflake.com/)  \n"
+                "- [Contact Support](https://www.snowflake.com/en/support/)"
+            )
 
     st.title("Cortex AI Assistant by DiLytics")
     semantic_model_filename = SEMANTIC_MODEL.split("/")[-1]
@@ -752,7 +751,7 @@ else:
                     assistant_response["content"] = response_content
                     st.session_state.messages.append({"role": "assistant", "content": response_content})
                     st.session_state.last_suggestions = [
-                        "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
+                       sieme  "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
                         "Give me date wise award breakdowns",
                         "What is this document about",
                         "Subject areas"
@@ -891,7 +890,7 @@ else:
                     st.session_state.messages.append({"role": "assistant", "content": response_content})
 
                 if failed_response:
-                    suggestions = suggest_sample_questions(query)
+                    suggestions = suggest_sample_questions(query 
                     response_content = "I am not sure about your question. Here are some questions you can ask me:\n\n"
                     for i, suggestion in enumerate(suggestions, 1):
                         response_content += f"{i}. {suggestion}\n"
