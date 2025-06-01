@@ -441,40 +441,10 @@ else:
         sentences = re.split(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|")\s', answer)
         return "\n".join(f"• {sent.strip()}" for sent in sentences[:6])
 
-    def suggest_sample_questions(query: str) -> List[str]:
-        try:
-            prompt = (
-                f"The user asked: '{query}'. This question may be ambiguous or unclear in the context of a business-facing grants analytics assistant. "
-                f"Generate 3–5 clear, concise sample questions related to grants, awards, budgets, or encumbrances. "
-                f"The questions should be easy for a business user to understand and answerable using grants data such as award budgets, encumbrances, or dates. "
-                f"Format as a numbered list. Example format:\n1. What is the total award budget posted by date?\n2. Which awards have the highest encumbrances?"
-            )
-            response = complete(st.session_state.model_name, prompt)
-            if response:
-                questions = []
-                for line in response.split("\n"):
-                    line = line.strip()
-                    if re.match(r'^\d+\.\s*.+', line):
-                        question = re.sub(r'^\d+\.\s*', '', line)
-                        questions.append(question)
-                return questions[:5]
-            else:
-                return [
-                    "What is the total award budget posted by date?",
-                    "Which awards have the highest encumbrances in the current quarter?",
-                    "What is the total amount of award encumbrances approved this month?",
-                    "What is the date-wise breakdown of award budgets?",
-                    "Which awards have pending encumbrances for more than two weeks?"
-                ]
-        except Exception as e:
-            st.error(f"❌ Failed to generate sample questions: {str(e)}")
-            return [
-                "What is the total award budget posted by date?",
-                "Which awards have the highest encumbrances in the current quarter?",
-                "What is the total amount of award encumbrances approved this month?",
-                "What is the date-wise breakdown of award budgets?",
-                "Which awards have pending encumbrances for more than two weeks?"
-            ]
+   File "/mount/src/grants/grants_streamlit.py", line 480
+      try:
+      ^
+IndentationError: expected an indented block after function definition on line 479
 
     def display_chart_tab(df: pd.DataFrame, prefix: str = "chart", query: str = ""):
     try:
