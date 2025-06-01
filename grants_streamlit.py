@@ -1,4 +1,3 @@
-```python
 import streamlit as st
 import json
 import re
@@ -946,17 +945,6 @@ else:
                         st.error(f"❌ Error processing query: {str(e)}")
         except Exception as e:
             st.error(f"❌ Error handling query: {str(e)}")
-```
 
-### Instructions
-1. Replace the entire content of `grants_streamlit.py` with the code above.
-2. Save the file.
-3. Rerun the Streamlit app using `streamlit run grants_streamlit.py`.
-4. Ensure your editor (e.g., VS Code) is configured to use 4 spaces for indentation and not tabs (`"editor.insertSpaces": true`, `"editor.tabSize": 4`).
 
-### Additional Notes
-- **ScriptRunContext Warnings**: The `missing ScriptRunContext` warnings can be ignored, as they occur in bare mode and don’t affect functionality.
-- **Editor Setup**: To prevent future indentation issues, use an editor with visible whitespace and set it to convert tabs to 4 spaces. Run `python -m tabnanny grants_streamlit.py` to check for indentation errors.
-- **Testing**: After applying the fix, verify the app runs without errors. If issues persist, share the new error log or the lines around 336 for further diagnosis.
 
-This should resolve both the `IndentationError` and `SyntaxWarning`. Let me know if you need additional help!
