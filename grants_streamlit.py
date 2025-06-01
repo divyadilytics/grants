@@ -282,7 +282,7 @@ if not st.session_state.authenticated:
             st.success("Authentication successful! Redirecting...")
             st.rerun()
         except Exception as e:
-            st.error(f"Authentication failed: {e}")
+            st.error(f"Authentication failed: {str(e)}")
 else:
     session = st.session_state.snowpark_session
     root = Root(session)
@@ -441,53 +441,83 @@ else:
         sentences = re.split(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|")\s', answer)
         return "\n".join(f"• {sent.strip()}" for sent in sentences[:6])
 
-   File "/mount/src/grants/grants_streamlit.py", line 480
-      try:
-      ^
-IndentationError: expected an indented block after function definition on line 479
+    def suggest_sample_questions(query: str) -> List[str]:
+        try:
+            prompt = (
+                f"The user asked: '{query}'. This question may be ambiguous or unclear in the context of a business-facing grants analytics assistant. "
+                f"Generate 3–5 clear, concise sample questions related to grants, awards, budgets, or encumbrances. "
+                f"The questions should be easy for a business user to understand and answerable using grants data such as award budgets, encumbrances, or dates. "
+                f"Format as a numbered list. Example format:\n1. What is the total award budget posted by date?\n2. Which awards have the highest encumbrances?"
+            )
+            response = complete(st.session_state.model_name, prompt)
+            if response:
+                questions = []
+                for line in response.split("\n"):
+                    line = line.strip()
+                    if re.match(r'^\d+\.\s*.+', line):
+                        question = re.sub(r'^\d+\.\s*', '', line)
+                        questions.append(question)
+                return questions[:5]
+            else:
+                return [
+                    "What is the total award budget posted by date?",
+                    "Which awards have the highest encumbrances in the current quarter?",
+                    "What is the total amount of award encumbrances approved this month?",
+                    "What is the date-wise breakdown of award budgets?",
+                    "Which awards have pending encumbrances for more than two weeks?",
+                ]
+        except Exception as e:
+            st.error(f"❌ Failed to generate sample questions: {str(e)}")
+            return [
+                "What is the total award budget posted by date?",
+                "Which awards have the highest encumbrances in the current quarter?",
+                "What is the total amount of award encumbrances approved this month?",
+                "What is the date-wise breakdown of award budgets?",
+                "Which awards have pending encumbrances for more than two weeks?",
+            ]
 
     def display_chart_tab(df: pd.DataFrame, prefix: str = "chart", query: str = ""):
-    try:
-        if df is None or df.empty or len(df.columns) < 2:
-            st.warning("No valid data available for visualization.")
+        try:
+            if df is None or df.empty or len(df.columns) < 2:
+                st.warning("No valid data available for visualization.")
+                if st.session_state.debug_mode:
+                    st.sidebar.warning(f"Chart Data Issue: df={df}, columns={df.columns if df is not None else 'None'}")
+                return
+            query_lower = query.lower()
+            if re.search(r'\b(county|jurisdiction)\b', query_lower):
+                default_data = "Pie Chart"
+            elif re.search(r'\b(month|year|date)\b', query_lower):
+                default_data = "Line Chart"
+            else:
+                default_data = "Bar Chart"
+            all_cols = list(df.columns)
+            col1, col2, col3 = st.columns(3)
+            x_col = col1.selectbox("X axis", all_cols, index=0, key=f"{prefix}_x")
+            remaining_cols = [c for c in all_cols if c != x_col]
+            y_col = col2.selectbox("Y axis", remaining_cols, index=0, key=f"{prefix}_y")
+            chart_options = ["Line Chart", "Bar Chart", "Pie Chart", "Scatter Chart", "Histogram Chart"]
+            chart_type = col3.selectbox("Chart Type", chart_options, index=chart_options.index(default_data), key=f"{prefix}_type")
             if st.session_state.debug_mode:
-                st.sidebar.warning(f"Chart Data Issue: df={df}, columns={df.columns if df is not None else 'None'}")
-            return
-        query_lower = query.lower()
-        if re.search(r'\b(county|jurisdiction)\b', query_lower):
-            default_data = "Pie Chart"
-        elif re.search(r'\b(month|year|date)\b', query_lower):
-            default_data = "Line Chart"
-        else:
-            default_data = "Bar Chart"
-        all_cols = list(df.columns)
-        col1, col2, col3 = st.columns(3)
-        x_col = col1.selectbox("X axis", all_cols, index=0, key=f"{prefix}_x")
-        remaining_cols = [c for c in all_cols if c != x_col]
-        y_col = col2.selectbox("Y axis", remaining_cols, index=0, key=f"{prefix}_y")
-        chart_options = ["Line Chart", "Bar Chart", "Pie Chart", "Scatter Chart", "Histogram Chart"]
-        chart_type = col3.selectbox("Chart Type", chart_options, index=chart_options.index(default_data), key=f"{prefix}_type")
-        if st.session_state.debug_mode:
-            st.sidebar.text_area("Chart Config", f"X: {x_col}, Y: {y_col}, Type: {chart_type}", height=100)
-        if chart_type == "Line Chart":
-            fig = px.line(df, x=x_col, y=y_col, title=chart_type)
-            st.plotly_chart(fig, key=f"{prefix}_line")
-        elif chart_type == "Bar Chart":
-            fig = px.bar(df, x=x_col, y=y_col, title=chart_type)
-            st.plotly_chart(fig, key=f"{prefix}_bar")
-        elif chart_type == "Pie Chart":
-            fig = px.pie(df, names=x_col, values=y_col, title=chart_type)
-            st.plotly_chart(fig, key=f"{prefix}_pie")
-        elif chart_type == "Scatter Chart":
-            fig = px.scatter(df, x=x_col, y=y_col, title=chart_type)
-            st.plotly_chart(fig, key=f"{prefix}_scatter")
-        elif chart_type == "Histogram Chart":
-            fig = px.histogram(df, x=x_col, title=chart_type)
-            st.plotly_chart(fig, key=f"{prefix}_hist")
-    except Exception as e:
-        st.error(f"❌ Error generating chart: {str(e)}")
-        if st.session_state.debug_mode:
-            st.sidebar.error(f"Chart Error Details: {str(e)}")
+                st.sidebar.text_area("Chart Config", f"X: {x_col}, Y: {y_col}, Type: {chart_type}", height=100)
+            if chart_type == "Line Chart":
+                fig = px.line(df, x=x_col, y=y_col, title=chart_type)
+                st.plotly_chart(fig, key=f"{prefix}_line")
+            elif chart_type == "Bar Chart":
+                fig = px.bar(df, x=x_col, y=y_col, title=chart_type)
+                st.plotly_chart(fig, key=f"{prefix}_bar")
+            elif chart_type == "Pie Chart":
+                fig = px.pie(df, names=x_col, values=y_col, title=chart_type)
+                st.plotly_chart(fig, key=f"{prefix}_pie")
+            elif chart_type == "Scatter Chart":
+                fig = px.scatter(df, x=x_col, y=y_col, title=chart_type)
+                st.plotly_chart(fig, key=f"{prefix}_scatter")
+            elif chart_type == "Histogram Chart":
+                fig = px.histogram(df, x=x_col, title=chart_type)
+                st.plotly_chart(fig, key=f"{prefix}_hist")
+        except Exception as e:
+            st.error(f"❌ Error generating chart: {str(e)}")
+            if st.session_state.debug_mode:
+                st.sidebar.error(f"Chart Error Details: {str(e)}")
 
     def toggle_about():
         st.session_state.show_about = not st.session_state.show_about
@@ -721,10 +751,10 @@ IndentationError: expected an indented block after function definition on line 4
                     assistant_response["content"] = response_content
                     st.session_state.messages.append({"role": "assistant", "content": response_content})
                     st.session_state.last_suggestions = [
-                       sieme  "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
+                        "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
                         "Give me date wise award breakdowns",
                         "What is this document about",
-                        "Subject areas"
+                        "Subject areas",
                     ]
 
                 elif is_greeting or is_suggestion:
@@ -748,7 +778,7 @@ IndentationError: expected an indented block after function definition on line 4
                         "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
                         "Give me date wise award breakdowns",
                         "What is this document about",
-                        "Subject areas"
+                        "Subject areas",
                     ]
                     st.session_state.messages.append({"role": "assistant", "content": response_content})
 
@@ -860,7 +890,7 @@ IndentationError: expected an indented block after function definition on line 4
                     st.session_state.messages.append({"role": "assistant", "content": response_content})
 
                 if failed_response:
-                    suggestions = suggest_sample_questions(query 
+                    suggestions = suggest_sample_questions(query)
                     response_content = "I am not sure about your question. Here are some questions you can ask me:\n\n"
                     for i, suggestion in enumerate(suggestions, 1):
                         response_content += f"{i}. {suggestion}\n"
