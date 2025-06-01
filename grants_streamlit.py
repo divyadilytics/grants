@@ -420,7 +420,7 @@ else:
                 headers={
                     "Authorization": f'Snowflake Token="{st.session_state.CONN.rest.token}"',
                     "Content-Type": "application/json",
-                },
+                }
                 timeout=API_TIMEOUT // 1000
             )
             if st.session_state.debug_mode:
