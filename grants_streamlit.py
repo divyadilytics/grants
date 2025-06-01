@@ -6,7 +6,8 @@ import snowflake.connector
 import pandas as pd
 from snowflake.snowpark import Session
 from snowflake.core import Root
-from typing import Any, Dict, List, Option
+from typing import Any, Dict, List, Optional, Tuple
+import plotly.express as px
 import time
 
 # Snowflake/Cortex Configuration
