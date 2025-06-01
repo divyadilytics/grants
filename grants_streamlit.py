@@ -16,10 +16,9 @@ DATABASE = "AI"
 SCHEMA = "DWH_MART"
 API_ENDPOINT = "/api/v2/cortex/agent:run"
 API_TIMEOUT = 50000  # in milliseconds
-
-# Single Semantic Model Configuration
+CORTEX_SEARCH_SERVICES = "AI.DWH_MART.Grants_search_services"
+CECON_SEARCH_SERVICES = "AI.DWH_MART.Grants_search_services"
 SEMANTIC_MODEL = '@"AI"."DWH_MART"."GRANTS"/grantsyaml_27.yaml'
-CORTEX_SEARCH_SERVICES = "AI.DWH_MART.GRANTS_SEARCH_SERVICES"
 
 # Model options
 MODELS = [
@@ -133,19 +132,19 @@ def init_service_metadata():
             if services:
                 for s in services:
                     svc_name = s["name"]
-                    if svc_name == CORTEX_SEARCH_SERVICES:
-                        svc_search_col = session.sql(
-                            f"DESC CORTEX SEARCH SERVICE {svc_name};"
-                        ).collect()[0]["search_column"]
-                        service_metadata.append(
-                            {"name": svc_name, "search_column": svc_search_col}
-                        )
-            st.session_state.service_metadata = service_metadata or [{"name": CORTEX_SEARCH_SERVICES, "search_column": ""}]
+                    svc_search_col = session.sql(
+                        f"DESC CORTEX SEARCH SERVICE {svc_name};"
+                    ).collect()[0]["search_column"]
+                    service_metadata.append(
+                        {"name": svc_name, "search_column": svc_search_col}
+                    )
+            st.session_state.service_metadata = service_metadata
         except Exception as e:
             st.error(f"❌ Failed to initialize Cortex Search service metadata: {str(e)}")
             st.session_state.service_metadata = [{"name": CORTEX_SEARCH_SERVICES, "search_column": ""}]
 
 def init_config_options():
+    # This function is now empty as all elements have been moved to the sidebar directly
     pass
 
 def query_cortex_search_service(query):
@@ -311,9 +310,8 @@ else:
 
     def is_structured_query(query: str):
         structured_patterns = [
-            r'\b(count|number|where|group by|order by|sum|avg|max|min|total|how many|which|show|list|names?|are there any|rejected deliveries?|least|highest|duration|approval)\b',
-            r'\b(vendor|supplier|requisition|purchase order|po|organization|department|buyer|delivery|received|billed|rejected|late|on time|late deliveries?|Suppliers|payment|billing|percentage|list)\b',
-            r'\b(property|tenant|lease|rent|occupancy|maintenance)\b'
+            r'\b(count|number|where|group by|order by|sum|avg|max|min|total|how many|which|show|list|names?|are there any|least|highest|duration|approval)\b',
+            r'\b(award|budget|posted|encumbrance|date|task|actual|approved|total)\b'
         ]
         return any(re.search(pattern, query.lower()) for pattern in structured_patterns)
 
@@ -327,7 +325,7 @@ else:
 
     def is_question_suggestion_query(query: str):
         suggestion_patterns = [
-            r'\b(what|which|how)\b.*\b(questions|type of questions|queries|information|data|insights)\b.*\b(ask|can i ask|pose|get|available)\b',
+            r'\b(what|which|how)\b.*\b(questions|type of questions|queries)\b.*\b(ask|can i ask|pose)\b',
             r'\b(give me|show me|list)\b.*\b(questions|examples|sample questions)\b'
         ]
         return any(re.search(pattern, query.lower()) for pattern in suggestion_patterns)
@@ -446,8 +444,10 @@ else:
     def suggest_sample_questions(query: str) -> List[str]:
         try:
             prompt = (
-                f"The user asked for: '{query}'. Generate 3–5 clear, concise sample questions related to properties, leases, tenants, rent, or occupancy metrics. "
-                f"Format as a numbered list."
+                f"The user asked: '{query}'. This question may be ambiguous or unclear in the context of a business-facing grants analytics assistant. "
+                f"Generate 3–5 clear, concise sample questions related to grants, awards, budgets, or encumbrances. "
+                f"The questions should be easy for a business user to understand and answerable using grants data such as award budgets, encumbrances, or dates. "
+                f"Format as a numbered list. Example format:\n1. What is the total award budget posted by date?\n2. Which awards have the highest encumbrances?"
             )
             response = complete(st.session_state.model_name, prompt)
             if response:
@@ -460,36 +460,20 @@ else:
                 return questions[:5]
             else:
                 return [
-                    "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
-                    "Give me date wise award breakdowns",
-                    "Give me award breakdowns",
-                    "Give me date wise award budget, actual award posted,award encunbrance posted,award encumbrance approved",
-                    "What is the task actual posted by award name?",
-                    "What is the award budget posted by date for these awards?",
-                    "What is the total award encumbrance posted for these awards?",
-                    "What is the total amount of award encumbrances approved?",
-                    "What is the total actual award posted for these awards?",
-                    "what is the award budget posted?",
-                    "what is this document about",
-                    "Subjec areas",
-                    "explain five layers in High level Architecture"
+                    "What is the total award budget posted by date?",
+                    "Which awards have the highest encumbrances in the current quarter?",
+                    "What is the total amount of award encumbrances approved this month?",
+                    "What is the date-wise breakdown of award budgets?",
+                    "Which awards have pending encumbrances for more than two weeks?"
                 ]
         except Exception as e:
             st.error(f"❌ Failed to generate sample questions: {str(e)}")
             return [
-                 "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
-                 "Give me date wise award breakdowns",
-                 "Give me award breakdowns",
-                 "Give me date wise award budget, actual award posted,award encunbrance posted,award encumbrance approved",
-                 "What is the task actual posted by award name?",
-                 "What is the award budget posted by date for these awards?",
-                 "What is the total award encumbrance posted for these awards?",
-                 "What is the total amount of award encumbrances approved?",
-                 "What is the total actual award posted for these awards?",
-                 "what is the award budget posted?",
-                 "what is this document about",
-                 "Subjec areas",
-                 "explain five layers in High level Architecture"
+                "What is the total award budget posted by date?",
+                "Which awards have the highest encumbrances in the current quarter?",
+                "What is the total amount of award encumbrances approved this month?",
+                "What is the date-wise breakdown of award budgets?",
+                "Which awards have pending encumbrances for more than two weeks?"
             ]
 
     def display_chart_tab(df: pd.DataFrame, prefix: str = "chart", query: str = ""):
@@ -564,12 +548,11 @@ else:
             border: none !important;
             padding: 0.5rem 1rem !important;
         }
-        /* Custom styling for Clear conversation, About, Help & Documentation, History, and Sample Questions buttons */
+        /* Custom styling for Clear conversation, About, Help & Documentation, and History buttons */
         [data-testid="stSidebar"] [data-testid="stButton"][aria-label="Clear conversation"] > button,
         [data-testid="stSidebar"] [data-testid="stButton"][aria-label="About"] > button,
         [data-testid="stSidebar"] [data-testid="stButton"][aria-label="Help & Documentation"] > button,
-        [data-testid="stSidebar"] [data-testid="stButton"][aria-label="History"] > button,
-        [data-testid="stSidebar"] [data-testid="stButton"][aria-label="Sample Questions"] > button {
+        [data-testid="stSidebar"] [data-testid="stButton"][aria-label="History"] > button {
             background-color: #28A745 !important;
             color: white !important;
             font-weight: normal !important;
@@ -578,68 +561,58 @@ else:
         </style>
         """, unsafe_allow_html=True)
 
-        # 1. Snowflake Logo
+        # Logo
         logo_url = "https://www.snowflake.com/wp-content/themes/snowflake/assets/img/logo-blue.svg"
         st.image(logo_url, width=250)
 
-        # 2. Clear Conversation Button
-        if st.button("Clear conversation", key="clear_conversation_button"):
-            start_new_conversation()
+        # First Section: Select Data Source, Config Options, Sample Questions
+        with st.container():
+            # Select Data Source
+            st.radio("Select Data Source:", ["Database", "Document"], key="data_source")
 
-        # 3. Select Data Source
-        st.radio("Select Data Source:", ["Database", "Document"], key="data_source")
-
-        # 4. Select Cortex Search Service
-        st.selectbox(
-            "Select Cortex Search Service:",
-            [CORTEX_SEARCH_SERVICES],
-            key="selected_cortex_search_service"
-        )
-
-        # 5. Debug
-        st.toggle("Debug", key="debug_mode", value=st.session_state.debug_mode)
-
-        # 6. Use Chat History
-        st.toggle("Use chat history", key="use_chat_history", value=True)
-
-        # Advanced Options
-        with st.expander("Advanced options"):
-            st.selectbox("Select model:", MODELS, key="model_name")
-            st.number_input(
-                "Select number of context chunks",
-                value=100,
-                key="num_retrieved_chunks",
-                min_value=1,
-                max_value=400
+            # Config Options
+            st.selectbox(
+                "Select cortex search service:",
+                [s["name"] for s in st.session_state.service_metadata] or [CORTEX_SEARCH_SERVICES],
+                key="selected_cortex_search_service"
             )
-            st.number_input(
-                "Select number of messages to use in chat history",
-                value=10,
-                key="num_chat_messages",
-                min_value=1,
-                max_value=100
-            )
-        if st.session_state.debug_mode:
-            st.expander("Session State").write(st.session_state)
+            st.toggle("Debug", key="debug_mode", value=st.session_state.debug_mode)
+            st.toggle("Use chat history", key="use_chat_history", value=True)
+            with st.expander("Advanced options"):
+                st.selectbox("Select model:", MODELS, key="model_name")
+                st.number_input(
+                    "Select number of context chunks",
+                    value=100,
+                    key="num_retrieved_chunks",
+                    min_value=1,
+                    max_value=400
+                )
+                st.number_input(
+                    "Select number of messages to use in chat history",
+                    value=10,
+                    key="num_chat_messages",
+                    min_value=1,
+                    max_value=100
+                )
+            if st.session_state.debug_mode:
+                st.expander("Session State").write(st.session_state)
 
-        # 7. Sample Questions Button
-        if st.button("Sample Questions", key="sample_questions_button"):
-            st.session_state.show_sample_questions = not st.session_state.get("show_sample_questions", False)
-        if st.session_state.get("show_sample_questions", False):
-            st.markdown("### Sample Questions")
+            # Sample Questions
+            st.subheader("Sample Questions")
             sample_questions = [
-                "What is Property Management",
-                "Total number of properties currently occupied?",
-                "What is the number of properties by occupancy status?",
-                "What is the number of properties currently leased?",
-                "What are the supplier payments compared to customer billing by month?",
-                "What is the total number of suppliers?",
-                "What is the average supplier payment per property?",
-                "What are the details of lease execution, commencement, and termination?",
-                "What are the customer billing and supplier payment details by location and purpose?",
-                "What is the budget recovery by billing purpose?",
-                "What are the details of customer billing?",
-                "What are the details of supplier payments?"
+                "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
+                "Give me date wise award breakdowns",
+                "Give me award breakdowns",
+                "Give me date wise award budget, actual award posted, award encumbrance posted, award encumbrance approved",
+                "What is the task actual posted by award name?",
+                "What is the award budget posted by date for these awards?",
+                "What is the total award encumbrance posted for these awards?",
+                "What is the total amount of award encumbrances approved?",
+                "What is the total actual award posted for these awards?",
+                "what is the award budget posted?",
+                "what is this document about",
+                "Subject areas",
+                "explain five layers in High level Architecture"
             ]
             for sample in sample_questions:
                 if st.button(sample, key=f"sidebar_{sample}"):
@@ -649,8 +622,13 @@ else:
         # Divider
         st.markdown("---")
 
-        # History, About, Help & Documentation
+        # Second Section: Clear conversation, History, About, Help & Documentation
         with st.container():
+            # Clear conversation button
+            if st.button("Clear conversation", key="clear_conversation_button"):
+                start_new_conversation()
+
+            # History button and content
             if st.button("History", key="history_button"):
                 toggle_history()
             if st.session_state.show_history:
@@ -664,6 +642,7 @@ else:
                             st.session_state.query = question
                             st.session_state.show_greeting = False
 
+            # About button and content
             if st.button("About", key="about_button"):
                 toggle_about()
             if st.session_state.show_about:
@@ -674,6 +653,7 @@ else:
                     "Simply ask a question below to see relevant answers and visualizations."
                 )
 
+            # Help & Documentation button and content
             if st.button("Help & Documentation", key="help_button"):
                 toggle_help()
             if st.session_state.show_help:
@@ -689,10 +669,9 @@ else:
     st.markdown(f"Semantic Model: `{semantic_model_filename}`")
     init_service_metadata()
 
+    # Welcome Text Under Title
     if st.session_state.show_greeting and not st.session_state.chat_history:
-        st.markdown("Welcome! I’m the Snowflake AI Assistant, ready to assist you with grant data analysis, summaries, and answers — simply type your question to get started
-
-")
+        st.markdown("Welcome! I’m the Snowflake AI Assistant, ready to assist you with grant data analysis, summaries, and answers — simply type your question to get started.")
     else:
         st.session_state.show_greeting = False
 
@@ -708,10 +687,12 @@ else:
                     st.markdown("**📈 Visualization:**")
                     display_chart_tab(message["results"], prefix=f"chart_{hash(message['content'])}", query=message.get("query", ""))
 
+    # Get query from chat input or session state
     chat_input_query = st.chat_input("Ask your question...")
     if chat_input_query:
         st.session_state.query = chat_input_query
 
+    # Process the query (either from chat input, a clicked sample question, or a history question)
     if st.session_state.query:
         query = st.session_state.query
         if query.lower().startswith("no of"):
@@ -738,6 +719,7 @@ else:
         with st.chat_message("assistant"):
             with st.spinner("Generating Response..."):
                 response_placeholder = st.empty()
+                # Ensure data_source is set to "Database" if unset or invalid
                 if st.session_state.data_source not in ["Database", "Document"]:
                     st.session_state.data_source = "Database"
                 is_structured = is_structured_query(query) and st.session_state.data_source == "Database"
@@ -745,6 +727,7 @@ else:
                 is_summarize = is_summarize_query(query)
                 is_suggestion = is_question_suggestion_query(query)
                 is_greeting = is_greeting_query(query)
+                # Debugging: Log the values to understand the condition
                 if st.session_state.debug_mode:
                     st.sidebar.text_area("Debug Info", f"is_structured: {is_structured}\nData Source: {st.session_state.data_source}", height=100)
                 assistant_response = {"role": "assistant", "content": "", "query": query}
@@ -753,14 +736,15 @@ else:
 
                 if is_greeting and original_query.lower().strip() == "hi":
                     response_content = """
-                    "Hello! Welcome to the GRANTS AI Assistant! I'm here to help you explore and analyze "
-                     "grant-related data, answer questions about awards, budgets, and more, or provide insights "
-                     "from documents.\n\nHere are some questions you can try:\n"
-                     "1. What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?\n"
-                     "2.Give me date-wise award breakdowns.\n"
-                     "3.What is this document about?\n"
-                     "4.List all subject areas.\n\n"
-                     "Feel free to ask anything, or pick one of the suggested questions to get started!"
+                    Hello! Welcome to the GRANTS AI Assistant! I'm here to help you explore and analyze grant-related data, answer questions about awards, budgets, and more, or provide insights from documents.
+
+                    Here are some questions you can try:
+
+                    What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?
+                    Give me date-wise award breakdowns.
+                    What is this document about?
+                    List all subject areas.
+                    Feel free to ask anything, or pick one of the suggested questions to get started!
                     """
                     with response_placeholder:
                         st.write_stream(stream_text(response_content))
@@ -768,53 +752,34 @@ else:
                     assistant_response["content"] = response_content
                     st.session_state.messages.append({"role": "assistant", "content": response_content})
                     st.session_state.last_suggestions = [
-                         "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
-                         "Give me date wise award breakdowns",
-                         "Give me award breakdowns",
-                         "Give me date wise award budget, actual award posted,award encunbrance posted,award encumbrance approved",
-                         "What is the task actual posted by award name?",
-                         "What is the award budget posted by date for these awards?",
-                         "What is the total award encumbrance posted for these awards?",
-                         "What is the total amount of award encumbrances approved?",
-                         "What is the total actual award posted for these awards?",
-                         "what is the award budget posted?",
-                         "what is this document about",
-                         "Subjec areas",
-                         "explain five layers in High level Architecture"
-                        ]
+                        "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
+                        "Give me date wise award breakdowns",
+                        "What is this document about",
+                        "Subject areas"
+                    ]
 
                 elif is_greeting or is_suggestion:
                     greeting = original_query.lower().split()[0]
                     if greeting not in ["hi", "hello", "hey", "greet"]:
                         greeting = "hello"
                     response_content = (
-                        f "Hello! Welcome to the GRANTS AI Assistant! I'm here to help you explore and analyze "
-                          "grant-related data, answer questions about awards, budgets, and more, or provide insights "
-                          "from documents.\n\nHere are some questions you can try:\n"
-                          "   1. What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?\n"
-                          "   2.Give me date-wise award breakdowns.\n"
-                          "   3.What is this document about?\n"
-                          "   4.List all subject areas.\n\n"
-                         "Feel free to ask anything, or pick one of the suggested questions to get started!"
-            )
+                        f"Hello! Welcome to the GRANTS AI Assistant! I'm here to help you explore and analyze grant-related data, answer questions about awards, budgets, and more, or provide insights from documents.\n\n"
+                        "Here are some questions you can try:\n\n"
+                        "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?\n"
+                        "Give me date-wise award breakdowns.\n"
+                        "What is this document about?\n"
+                        "List all subject areas.\n\n"
+                        "Feel free to ask anything, or pick one of the suggested questions to get started!"
+                    )
                     with response_placeholder:
                         st.write_stream(stream_text(response_content))
                         st.markdown(response_content, unsafe_allow_html=True)
                     assistant_response["content"] = response_content
                     st.session_state.last_suggestions = [
-                         "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
-                         "Give me date wise award breakdowns",
-                         "Give me award breakdowns",
-                         "Give me date wise award budget, actual award posted,award encunbrance posted,award encumbrance approved",
-                         "What is the task actual posted by award name?",
-                         "What is the award budget posted by date for these awards?",
-                         "What is the total award encumbrance posted for these awards?",
-                         "What is the total amount of award encumbrances approved?",
-                         "What is the total actual award posted for these awards?",
-                         "what is the award budget posted?",
-                         "what is this document about",
-                         "Subjec areas",
-                         "explain five layers in High level Architecture"
+                        "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
+                        "Give me date wise award breakdowns",
+                        "What is this document about",
+                        "Subject areas"
                     ]
                     st.session_state.messages.append({"role": "assistant", "content": response_content})
 
@@ -943,4 +908,5 @@ else:
                 st.session_state.current_results = assistant_response.get("results")
                 st.session_state.current_sql = assistant_response.get("sql")
                 st.session_state.current_summary = assistant_response.get("summary")
+                # Reset the query after processing to avoid reprocessing on rerun
                 st.session_state.query = None
