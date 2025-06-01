@@ -582,7 +582,7 @@ else:
         <style>
         /* Default styling for sidebar buttons (suggested questions) */
         [data-testid="stSidebar"] [data-testid="stButton"] > button {
-            background-color: #29B5E8 !important;
+            background-color: #29ThrowB5E8 !important;
             color: white !important;
             font-weight: bold !important;
             width: 100% !important;
@@ -664,7 +664,7 @@ else:
             for sample in sample_questions:
                 if st.button(sample, key=f"sidebar_{sample}"):
                     st.session_state.query = sample
-                    st.session_state.show_greeting = False
+                    st.session_state.show_gre Nuneseting = False
 
         st.markdown("---")
 
@@ -776,20 +776,23 @@ else:
                 response_content = ""
                 failed_response = False
 
-                # Handle greeting query ("hi")
-                if is_greeting and original_query.lower().strip() == "hi":
+                # Handle greeting query
+                if is_greeting or is_suggestion:
                     # Define suggested questions for the user
                     suggested_questions = [
                         "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
                         "Give me date-wise award breakdowns.",
-                        "Give me award breakdowns.",
-                        "What is the award budget posted?",
+                        "What is this document about?",
+                        "List all subject areas."
                     ]
 
-                    # Format the response: simple greeting followed by numbered questions
+                    # Format the response with the new greeting
                     response_content = (
-                        "Hello! I'm here to help.\n\n" +
-                        "\n".join([f"{i}. {question}" for i, question in enumerate(suggested_questions, 1)])
+                        "Hello! Welcome to the GRANTS AI Assistant!\n"
+                        "I'm here to help you explore and analyze grant-related data, answer questions about awards, budgets, and more, or provide insights from documents.\n\n"
+                        "Here are some questions you can try:\n\n" +
+                        "\n".join([f"{i}. {question}" for i, question in enumerate(suggested_questions, 1)]) +
+                        "\n\nFeel free to ask anything, or pick one of the suggested questions to get started!"
                     )
 
                     # Display the response
@@ -800,35 +803,6 @@ else:
                     assistant_response["content"] = response_content
                     st.session_state.messages.append({"role": "assistant", "content": assistant_response["content"]})
                     st.session_state.last_suggestions = suggested_questions
-
-                # Handle other greetings or suggestion requests
-                elif is_greeting or is_suggestion:
-                    greeting = original_query.lower().split()[0]
-                    if greeting not in ["hi", "hello", "hey", "greet"]:
-                        greeting = "hello"
-                    
-                    # Use the same suggested questions for consistency
-                    suggested_questions = [
-                        "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
-                        "Give me date-wise award breakdowns.",
-                        "Give me award breakdowns.",
-                        "What is the award budget posted?",
-                    ]
-
-                    # Format the response: simple greeting followed by numbered questions
-                    response_content = (
-                        f"{greeting.capitalize()}! I'm here to help.\n\n" +
-                        "\n".join([f"{i}. {question}" for i, question in enumerate(suggested_questions, 1)])
-                    )
-
-                    # Display the response
-                    with response_placeholder:
-                        st.markdown(response_content, unsafe_allow_html=True)
-
-                    # Update session state
-                    assistant_response["content"] = response_content
-                    st.session_state.last_suggestions = suggested_questions
-                    st.session_state.messages.append({"role": "assistant", "content": response_content})
 
                 # Handle content generation queries
                 elif is_complete:
