@@ -735,16 +735,16 @@ else:
 
                 if is_greeting and original_query.lower().strip() == "hi":
                     response_content = """
-                    Hello! Welcome to the GRANTS AI Assistant!\n,
-                    I'm here to help you explore and analyze grant-related data, answer questions about awards, budgets, and more, or provide insights from documents.\n,
+                    "Hello! Welcome to the GRANTS AI Assistant!\n",
+                    "I'm here to help you explore and analyze grant-related data, answer questions about awards, budgets, and more, or provide insights from documents.\n",
 
-                    Here are some questions you can try:\n
+                    "Here are some questions you can try:\n",
 
-                    1. What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?\n,
-                    2. Give me date-wise award breakdowns.\n,
-                    3. Give me award breakdowns.\n,
-                    4. Show me the Award budget?\n,
-                    Feel free to ask anything, or pick one of the suggested questions to get started!
+                    "1. What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?\n",
+                    "2. Give me date-wise award breakdowns.\n",
+                    "3. Give me award breakdowns.\n",
+                    "4. Show me the Award budget?\n",
+                    "Feel free to ask anything, or pick one of the suggested questions to get started!"
                     """
                     with response_placeholder:
                         st.write_stream(stream_text(response_content))
