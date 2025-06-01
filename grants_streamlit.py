@@ -477,47 +477,47 @@ else:
             ]
 
     def display_chart_tab(df: pd.DataFrame, prefix: str = "chart", query: str = ""):
-        try:
-            if df is None or df.empty or len(df.columns) < 2:
-                st.warning("No valid data available for visualization.")
-                if st.session_state.debug_mode:
-                    st.sidebar.warning(f"Chart Data Issue: df={df}, columns={df.columns if df is not None else 'None'}")
-                return
-            query_lower = query.lower()
-            if re.search(r'\b(county|jurisdiction)\b', query_lower):
-                default_data = "Pie Chart embalasan
-            elif re.search(r'\b(month|year|date)\b', query_lower):
-                default_data = "Line Chart"
-            else:
-                default_data = "Bar Chart"
-            all_cols = list(df.columns)
-            col1, col2, col3 = st.columns(3)
-            x_col = col1.selectbox("X axis", all_cols, index=0, key=f"{prefix}_x")
-            remaining_cols = [c for c in all_cols if c != x_col]
-            y_col = col2.selectbox("Y axis", remaining_cols, index=0, key=f"{prefix}_y")
-            chart_options = ["Line Chart", "Bar Chart", "Pie Chart", "Scatter Chart", "Histogram Chart"]
-            chart_type = col3.selectbox("Chart Type", chart_options, index=chart_options.index(default_data), key=f"{prefix}_type")
+    try:
+        if df is None or df.empty or len(df.columns) < 2:
+            st.warning("No valid data available for visualization.")
             if st.session_state.debug_mode:
-                st.sidebar.text_area("Chart Config", f"X: {x_col}, Y: {y_col}, Type: {chart_type}", height=100)
-            if chart_type == "Line Chart":
-                fig = px.line(df, x=x_col, y=y_col, title=chart_type)
-                st.plotly_chart(fig, key=f"{prefix}_line")
-            elif chart_type == "Bar Chart":
-                fig = px.bar(df, x=x_col, y=y_col, title=chart_type)
-                st.plotly_chart(fig, key=f"{prefix}_bar")
-            elif chart_type == "Pie Chart":
-                fig = px.pie(df, names=x_col, values=y_col, title=chart_type)
-                st.plotly_chart(fig, key=f"{prefix}_pie")
-            elif chart_type == "Scatter Chart":
-                fig = px.scatter(df, x=x_col, y=y_col, title=chart_type)
-                st.plotly_chart(fig, key=f"{prefix}_scatter")
-            elif chart_type == "Histogram Chart":
-                fig = px.histogram(df, x=x_col, title=chart_type)
-                st.plotly_chart(fig, key=f"{prefix}_hist")
-        except Exception as e:
-            st.error(f"❌ Error generating chart: {str(e)}")
-            if st.session_state.debug_mode:
-                st.sidebar.error(f"Chart Error Details: {str(e)}")
+                st.sidebar.warning(f"Chart Data Issue: df={df}, columns={df.columns if df is not None else 'None'}")
+            return
+        query_lower = query.lower()
+        if re.search(r'\b(county|jurisdiction)\b', query_lower):
+            default_data = "Pie Chart"
+        elif re.search(r'\b(month|year|date)\b', query_lower):
+            default_data = "Line Chart"
+        else:
+            default_data = "Bar Chart"
+        all_cols = list(df.columns)
+        col1, col2, col3 = st.columns(3)
+        x_col = col1.selectbox("X axis", all_cols, index=0, key=f"{prefix}_x")
+        remaining_cols = [c for c in all_cols if c != x_col]
+        y_col = col2.selectbox("Y axis", remaining_cols, index=0, key=f"{prefix}_y")
+        chart_options = ["Line Chart", "Bar Chart", "Pie Chart", "Scatter Chart", "Histogram Chart"]
+        chart_type = col3.selectbox("Chart Type", chart_options, index=chart_options.index(default_data), key=f"{prefix}_type")
+        if st.session_state.debug_mode:
+            st.sidebar.text_area("Chart Config", f"X: {x_col}, Y: {y_col}, Type: {chart_type}", height=100)
+        if chart_type == "Line Chart":
+            fig = px.line(df, x=x_col, y=y_col, title=chart_type)
+            st.plotly_chart(fig, key=f"{prefix}_line")
+        elif chart_type == "Bar Chart":
+            fig = px.bar(df, x=x_col, y=y_col, title=chart_type)
+            st.plotly_chart(fig, key=f"{prefix}_bar")
+        elif chart_type == "Pie Chart":
+            fig = px.pie(df, names=x_col, values=y_col, title=chart_type)
+            st.plotly_chart(fig, key=f"{prefix}_pie")
+        elif chart_type == "Scatter Chart":
+            fig = px.scatter(df, x=x_col, y=y_col, title=chart_type)
+            st.plotly_chart(fig, key=f"{prefix}_scatter")
+        elif chart_type == "Histogram Chart":
+            fig = px.histogram(df, x=x_col, title=chart_type)
+            st.plotly_chart(fig, key=f"{prefix}_hist")
+    except Exception as e:
+        st.error(f"❌ Error generating chart: {str(e)}")
+        if st.session_state.debug_mode:
+            st.sidebar.error(f"Chart Error Details: {str(e)}")
 
     def toggle_about():
         st.session_state.show_about = not st.session_state.show_about
