@@ -735,14 +735,14 @@ else:
 
                 if is_greeting and original_query.lower().strip() == "hi":
                     response_content = """
-                    Hello! Welcome to the GRANTS AI Assistant! I'm here to help you explore and analyze grant-related data, answer questions about awards, budgets, and more, or provide insights from documents.
+                    Hello! Welcome to the GRANTS AI Assistant!\n I'm here to help you explore and analyze grant-related data, answer questions about awards, budgets, and more, or provide insights from documents.\n
 
-                    Here are some questions you can try:
+                    Here are some questions you can try:\n
 
-                    What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?
-                    Give me date-wise award breakdowns.
-                    What is this document about?
-                    List all subject areas.
+                    What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?\n
+                    Give me date-wise award breakdowns.\n
+                    Give me award breakdowns.\n
+                    Show me the Award budget?\n
                     Feel free to ask anything, or pick one of the suggested questions to get started!
                     """
                     with response_placeholder:
@@ -753,8 +753,8 @@ else:
                     st.session_state.last_suggestions = [
                         "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
                         "Give me date wise award breakdowns",
-                        "What is this document about",
-                        "Subject areas",
+                        "Give me award breakdowns.t",
+                        "Show me the Award budget",
                     ]
 
                 elif is_greeting or is_suggestion:
@@ -762,13 +762,15 @@ else:
                     if greeting not in ["hi", "hello", "hey", "greet"]:
                         greeting = "hello"
                     response_content = (
-                        f"Hello! Welcome to the GRANTS AI Assistant! I'm here to help you explore and analyze grant-related data, answer questions about awards, budgets, and more, or provide insights from documents.\n\n"
-                        "Here are some questions you can try:\n\n"
-                        "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?\n"
-                        "Give me date-wise award breakdowns.\n"
-                        "What is this document about?\n"
-                        "List all subject areas.\n\n"
-                        "Feel free to ask anything, or pick one of the suggested questions to get started!"
+                        f" Hello! Welcome to the GRANTS AI Assistant!\n I'm here to help you explore and analyze grant-related data, answer questions about awards, budgets, and more, or provide insights from documents.\n
+
+                           Here are some questions you can try:\n
+
+                           1. What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?\n
+                           2. Give me date-wise award breakdowns.\n
+                           3. Give me award breakdowns.\n
+                           4. Show me the Award budget?\n
+                           Feel free to ask anything, or pick one of the suggested questions to get started!
                     )
                     with response_placeholder:
                         st.write_stream(stream_text(response_content))
@@ -777,8 +779,8 @@ else:
                     st.session_state.last_suggestions = [
                         "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
                         "Give me date wise award breakdowns",
-                        "What is this document about",
-                        "Subject areas",
+                        "Give me award breakdowns.t",
+                        "Show me the Award budget",
                     ]
                     st.session_state.messages.append({"role": "assistant", "content": response_content})
 
