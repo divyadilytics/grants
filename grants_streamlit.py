@@ -333,10 +333,13 @@ else:
                 st.sidebar.error(f"SQL Error Details: {str(e)}")
             return None
 
-    def is_structured_query(query: str):
-        """Check if the query is structured (likely to generate SQL)."""
-        structured_patterns = [
-            r'\b(count|number|where|group by|order by|sum|avg|max|min|total|how many|which|show|list|names
+   def is_structured_query(query: str):
+    """Check if the query is structured (likely to generate SQL)."""
+    structured_patterns = [
+        r'\b(count|number|where|group\s+by|order\s+by|sum|avg|max|min|total|how\s+many|which|show|list|summary)\b',
+        r'\b(award|budget|posted|encumbrance|date|task|actual|approved|total)\b'
+    ]
+    return any(re.search(pattern, query.lower()) for pattern in structured_patterns)
 
 System: The provided code appears to be truncated, as it ends abruptly in the middle of a regular expression pattern in the `is_structured_query` function. I'll provide a corrected and complete version of the code, fixing the typo (`show_gre Nuneseting` to `show_greeting`) and ensuring the code is complete by including the missing parts of the functions that were cut off. Since this is an update to the previous artifact, I'll use the same `artifact_id`.
 
