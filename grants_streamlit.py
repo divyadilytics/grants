@@ -336,6 +336,349 @@ else:
     def is_structured_query(query: str):
         """Check if the query is structured (likely to generate SQL)."""
         structured_patterns = [
+            r'\b(count|number|where|group by|order by|sum|avg|max|min|total|how many|which|show|list|names
+
+System: The provided code appears to be truncated, as it ends abruptly in the middle of a regular expression pattern in the `is_structured_query` function. I'll provide a corrected and complete version of the code, fixing the typo (`show_gre Nuneseting` to `show_greeting`) and ensuring the code is complete by including the missing parts of the functions that were cut off. Since this is an update to the previous artifact, I'll use the same `artifact_id`.
+
+<xaiArtifact artifact_id="4bf59a98-b271-4816-ab3d-f66d5bcc19ba" artifact_version_id="7e4fcbd2-0df8-4b75-8565-76e118e3dd36" title="Updated Streamlit App for Cortex AI Assistant" contentType="text/python">
+import streamlit as st
+import json
+import re
+import requests
+import snowflake.connector
+import pandas as pd
+from snowflake.snowpark import Session
+from snowflake.core import Root
+from typing import Any, Dict, List, Optional, Tuple
+import plotly.express as px
+import time
+
+# --- Configuration Settings for Snowflake and Cortex ---
+# Snowflake connection details
+HOST = "GBJYVCT-LSB50763.snowflakecomputing.com"
+DATABASE = "AI"
+SCHEMA = "DWH_MART"
+API_ENDPOINT = "/api/v2/cortex/agent:run"  # Endpoint for Cortex API calls
+API_TIMEOUT = 50000  # Timeout for API calls in milliseconds
+CORTEX_SEARCH_SERVICES = "AI.DWH_MART.Grants_search_services"  # Default Cortex search service
+CECON_SEARCH_SERVICES = "AI.DWH_MART.Grants_search_services"  # Alternative search service (unused)
+SEMANTIC_MODEL = '@"AI"."DWH_MART"."GRANTS"/grantsyaml_27.yaml'  # Semantic model for SQL generation
+
+# Available LLMs for Cortex
+MODELS = [
+    "mistral-large",
+    "snowflake-arctic",
+    "llama3-70b",
+    "llama3-8b",
+]
+
+# --- Streamlit Page Configuration ---
+st.set_page_config(
+    page_title="Welcome to Cortex AI Assistant",
+    layout="wide",  # Use wide layout for better UI space
+    initial_sidebar_state="auto"
+)
+
+# --- Initialize Session State ---
+# Ensure all session state variables are initialized to manage app state
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False  # Track login status
+    st.session_state.username = ""  # Store Snowflake username
+    st.session_state.password = ""  # Store Snowflake password
+    st.session_state.CONN = None  # Snowflake connection object
+    st.session_state.snowpark_session = None  # Snowpark session for Snowflake
+    st.session_state.chat_history = []  # Store chat history (user and assistant messages)
+    st.session_state.messages = []  # Store messages for display
+if "debug_mode" not in st.session_state:
+    st.session_state.debug_mode = False  # Enable/disable debug mode
+if "last_suggestions" not in st.session_state:
+    st.session_state.last_suggestions = []  # Store last suggested questions
+if "chart_x_axis" not in st.session_state:
+    st.session_state.chart_x_axis = None  # X-axis for charts
+if "chart_y_axis" not in st.session_state:
+    st.session_state.chart_y_axis = None  # Y-axis for charts
+if "chart_type" not in st.session_state:
+    st.session_state.chart_type = "Bar Chart"  # Default chart type
+if "current_query" not in st.session_state:
+    st.session_state.current_query = None  # Store the current user query
+if "current_results" not in st.session_state:
+    st.session_state.current_results = None  # Store query results
+if "current_sql" not in st.session_state:
+    st.session_state.current_sql = None  # Store generated SQL
+if "current_summary" not in st.session_state:
+    st.session_state.current_summary = None  # Store summarized response
+if "service_metadata" not in st.session_state:
+    st.session_state.service_metadata = []  # Metadata for Cortex search services
+if "selected_cortex_search_service" not in st.session_state:
+    st.session_state.selected_cortex_search_service = CORTEX_SEARCH_SERVICES  # Default search service
+if "model_name" not in st.session_state:
+    st.session_state.model_name = "mistral-large"  # Default LLM model
+if "num_retrieved_chunks" not in st.session_state:
+    st.session_state.num_retrieved_chunks = 100  # Number of context chunks to retrieve
+if "num_chat_messages" not in st.session_state:
+    st.session_state.num_chat_messages = 10  # Number of chat messages to use in history
+if "use_chat_history" not in st.session_state:
+    st.session_state.use_chat_history = True  # Enable/disable chat history usage
+if "clear_conversation" not in st.session_state:
+    st.session_state.clear_conversation = False  # Track if conversation should be cleared
+if "show_selector" not in st.session_state:
+    st.session_state.show_selector = False  # Show/hide selector (unused)
+if "show_greeting" not in st.session_state:
+    st.session_state.show_greeting = True  # Show initial greeting
+if "data_source" not in st.session_state:
+    st.session_state.data_source = "Database"  # Default data source (Database/Document)
+if "show_about" not in st.session_state:
+    st.session_state.show_about = False  # Show/hide About section
+if "show_help" not in st.session_state:
+    st.session_state.show_help = False  # Show/hide Help section
+if "show_history" not in st.session_state:
+    st.session_state.show_history = False  # Show/hide History section
+if "query" not in st.session_state:
+    st.session_state.query = None  # Store the current query from user input
+
+# --- Custom CSS ---
+# Hide Streamlit branding and prevent chat history shading for a cleaner UI
+st.markdown("""
+<style>
+#MainMenu, header, footer {visibility: hidden;}
+[data-testid="stChatMessage"] {
+    opacity: 1 !important;
+    background-color: transparent !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# --- Utility Functions ---
+def stream_text(text: str, chunk_size: int = 2, delay: float = 0.04):
+    """Stream text in chunks for a typewriter effect in the UI."""
+    for i in range(0, len(text), chunk_size):
+        yield text[i:i + chunk_size]
+        time.sleep(delay)
+
+def start_new_conversation():
+    """Reset the conversation state to start a new session."""
+    st.session_state.chat_history = []  # Clear chat history
+    st.session_state.messages = []  # Clear displayed messages
+    st.session_state.current_query = None  # Clear current query
+    st.session_state.current_results = None  # Clear query results
+    st.session_state.current_sql = None  # Clear generated SQL
+    st.session_state.current_summary = None  # Clear summarized response
+    st.session_state.chart_x_axis = None  # Reset chart X-axis
+    st.session_state.chart_y_axis = None  # Reset chart Y-axis
+    st.session_state.chart_type = "Bar Chart"  # Reset chart type
+    st.session_state.last_suggestions = []  # Clear last suggestions
+    st.session_state.clear_conversation = False  # Reset clear conversation flag
+    st.session_state.show_greeting = True  # Show greeting message
+    st.session_state.query = None  # Clear current query
+    st.session_state.show_history = False  # Hide history
+    st.rerun()  # Rerun the app to apply changes
+
+def init_service_metadata():
+    """Initialize metadata for Cortex Search services."""
+    if not st.session_state.service_metadata:
+        try:
+            # Fetch available Cortex Search services
+            services = session.sql("SHOW CORTEX SEARCH SERVICES;").collect()
+            service_metadata = []
+            if services:
+                for s in services:
+                    svc_name = s["name"]
+                    # Get the search column for each service
+                    svc_search_col = session.sql(
+                        f"DESC CORTEX SEARCH SERVICE {svc_name};"
+                    ).collect()[0]["search_column"]
+                    service_metadata.append(
+                        {"name": svc_name, "search_column": svc_search_col}
+                    )
+            st.session_state.service_metadata = service_metadata
+        except Exception as e:
+            # Fallback to default service if fetching metadata fails
+            st.error(f"❌ Failed to initialize Cortex Search service metadata: {str(e)}")
+            st.session_state.service_metadata = [{"name": CORTEX_SEARCH_SERVICES, "search_column": ""}]
+
+def init_config_options():
+    """Placeholder function for config options (moved to sidebar)."""
+    pass
+
+def query_cortex_search_service(query):
+    """Query the Cortex Search service to retrieve relevant context documents."""
+    try:
+        db, schema = session.get_current_database(), session.get_current_schema()
+        root = Root(session)
+        # Access the selected Cortex Search service
+        cortex_search_service = (
+            root.databases[db]
+            .schemas[schema]
+            .cortex_search_services[st.session_state.selected_cortex_search_service]
+        )
+        # Perform the search with the given query
+        context_documents = cortex_search_service.search(
+            query, columns=[], limit=st.session_state.num_retrieved_chunks
+        )
+        results = context_documents.results
+        service_metadata = st.session_state.service_metadata
+        # Extract the search column for the selected service
+        search_col = [s["search_column"] for s in service_metadata
+                      if s["name"] == st.session_state.selected_cortex_search_service][0]
+        context_str = ""
+        # Format the search results as a string
+        for i, r in enumerate(results):
+            context_str += f"Context document {i+1}: {r[search_col]} \n" + "\n"
+        if st.session_state.debug_mode:
+            st.sidebar.text_area("Context documents", context_str, height=500)
+        return context_str
+    except Exception as e:
+        st.error(f"❌ Error querying Cortex Search service: {str(e)}")
+        return ""
+
+def get_chat_history():
+    """Retrieve the most recent chat history messages."""
+    start_index = max(
+        0, len(st.session_state.chat_history) - st.session_state.num_chat_messages
+    )
+    return st.session_state.chat_history[start_index : len(st.session_state.chat_history) - 1]
+
+def make_chat_history_summary(chat_history, question):
+    """Generate a summary of the chat history to extend the current question."""
+    chat_history_str = "\n".join([f"{msg['role']}: {msg['content']}" for msg in chat_history])
+    prompt = f"""
+        [INST]
+        Based on the chat history below and the question, generate a query that extends the question
+        with the chat history provided. The query should be in natural language.
+        Answer with only the query. Do not add any explanation.
+
+        <chat_history>
+        {chat_history_str}
+        </chat_history>
+        <question>
+        {question}
+        </question>
+        [/INST]
+    """
+    summary = complete(st.session_state.model_name, prompt)
+    if st.session_state.debug_mode:
+        st.sidebar.text_area("Chat history summary", summary.replace("$", "\$"), height=150)
+    return summary
+
+def create_prompt(user_question):
+    """Create a prompt for the LLM, incorporating chat history and context."""
+    chat_history_str = ""
+    if st.session_state.use_chat_history:
+        chat_history = get_chat_history()
+        if chat_history:
+            # Summarize chat history and retrieve context
+            question_summary = make_chat_history_summary(chat_history, user_question)
+            prompt_context = query_cortex_search_service(question_summary)
+            chat_history_str = "\n".join([f"{msg['role']}: {msg['content']}" for msg in chat_history])
+        else:
+            prompt_context = query_cortex_search_service(user_question)
+    else:
+        prompt_context = query_cortex_search_service(user_question)
+        chat_history = []
+    
+    if not prompt_context.strip():
+        return complete(st.session_state.model_name, user_question)
+    
+    # Construct the prompt with chat history, context, and question
+    prompt = f"""
+        [INST]
+        You are a helpful AI chat assistant with RAG capabilities. When a user asks you a question,
+        you will also be given context provided between <context> and </context> tags. Use that context
+        with the user's chat history provided in the between <chat_history> and </chat_history> tags
+        to provide a summary that addresses the user's question. Ensure the answer is coherent, concise,
+        and directly relevant to the user's question.
+
+        If the user asks a generic question which cannot be answered with the given context or chat_history,
+        just respond directly and concisely to the user's question using the LLM.
+
+        <chat_history>
+        {chat_history_str}
+        </chat_history>
+        <context>
+        {prompt_context}
+        </context>
+        <question>
+        {user_question}
+        </question>
+        [/INST]
+        Answer:
+    """
+    return complete(st.session_state.model_name, prompt)
+
+def get_user_questions(limit=10):
+    """
+    Extract the last 'limit' user questions from the chat history.
+    Returns a list of questions in reverse chronological order (most recent first).
+    """
+    user_questions = [msg["content"] for msg in st.session_state.chat_history if msg["role"] == "user"]
+    return user_questions[-limit:][::-1]
+
+# --- Main Application Logic ---
+if not st.session_state.authenticated:
+    # --- Login Page ---
+    st.title("Welcome to Snowflake Cortex AI")
+    st.markdown("Please login to interact with your data")
+    st.session_state.username = st.text_input("Enter Snowflake Username:", value=st.session_state.username)
+    st.session_state.password = st.text_input("Enter Password:", type="password")
+    if st.button("Login"):
+        try:
+            # Connect to Snowflake
+            conn = snowflake.connector.connect(
+                user=st.session_state.username,
+                password=st.session_state.password,
+                account="GBJYVCT-LSB50763",
+                host=HOST,
+                port=443,
+                warehouse="COMPUTE_WH",
+                role="ACCOUNTADMIN",
+                database=DATABASE,
+                schema=SCHEMA,
+            )
+            st.session_state.CONN = conn
+            # Create a Snowpark session
+            snowpark_session = Session.builder.configs({
+                "connection": conn
+            }).create()
+            st.session_state.snowpark_session = snowpark_session
+            with conn.cursor() as cur:
+                cur.execute(f"USE DATABASE {DATABASE}")
+                cur.execute(f"USE SCHEMA {SCHEMA}")
+                cur.execute("ALTER SESSION SET TIMEZONE = 'UTC'")
+                cur.execute("ALTER SESSION SET QUOTED_IDENTIFIERS_IGNORE_CASE = TRUE")
+            st.session_state.authenticated = True
+            st.success("Authentication successful! Redirecting...")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Authentication failed: {str(e)}")
+else:
+    session = st.session_state.snowpark_session
+    root = Root(session)
+
+    def run_snowflake_query(query):
+        """Execute a Snowflake SQL query and return results as a DataFrame."""
+        try:
+            if not query:
+                return None
+            df = session.sql(query)
+            data = df.collect()
+            if not data:
+                if st.session_state.debug_mode:
+                    st.sidebar.warning("Query returned no data.")
+                return None
+            columns = df.schema.names
+            result_df = pd.DataFrame(data, columns=columns)
+            if st.session_state.debug_mode:
+                st.sidebar.text_area("Query Results", result_df.to_string(), height=200)
+            return result_df
+        except Exception as e:
+            st.error(f"❌ SQL Execution Error: {str(e)}")
+            if st.session_state.debug_mode:
+                st.sidebar.error(f"SQL Error Details: {str(e)}")
+            return None
+
+    def is_structured_query(query: str):
+        """Check if the query is structured (likely to generate SQL)."""
+        structured_patterns = [
             r'\b(count|number|where|group by|order by|sum|avg|max|min|total|how many|which|show|list|names?|are there any|least|highest|duration|approval)\b',
             r'\b(award|budget|posted|encumbrance|date|task|actual|approved|total)\b'
         ]
@@ -582,7 +925,7 @@ else:
         <style>
         /* Default styling for sidebar buttons (suggested questions) */
         [data-testid="stSidebar"] [data-testid="stButton"] > button {
-            background-color: #29ThrowB5E8 !important;
+            background-color: #29B5E8 !important;
             color: white !important;
             font-weight: bold !important;
             width: 100% !important;
@@ -664,7 +1007,7 @@ else:
             for sample in sample_questions:
                 if st.button(sample, key=f"sidebar_{sample}"):
                     st.session_state.query = sample
-                    st.session_state.show_gre Nuneseting = False
+                    st.session_state.show_greeting = False
 
         st.markdown("---")
 
