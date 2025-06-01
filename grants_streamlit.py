@@ -734,55 +734,59 @@ else:
                 failed_response = False
 
                 if is_greeting and original_query.lower().strip() == "hi":
-                    response_content = """
-                    "Hello! Welcome to the GRANTS AI Assistant!\n",
-                    "I'm here to help you explore and analyze grant-related data, answer questions about awards, budgets, and more, or provide insights from documents.\n",
-
-                    "Here are some questions you can try:\n",
-
-                    "1. What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?\n",
-                    "2. Give me date-wise award breakdowns.\n",
-                    "3. Give me award breakdowns.\n",
-                    "4. Show me the Award budget?\n",
-                    "Feel free to ask anything, or pick one of the suggested questions to get started!"
-                    """
-                    with response_placeholder:
-                        st.write_stream(stream_text(response_content))
-                        st.markdown(response_content, unsafe_allow_html=True)
-                    assistant_response["content"] = response_content
-                    st.session_state.messages.append({"role": "assistant", "content": response_content})
-                    st.session_state.last_suggestions = [
+                    # Define the suggested questions
+                    suggested_questions = [
                         "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
-                        "Give me date wise award breakdowns",
-                        "Give me award breakdowns.t",
-                        "Show me the Award budget",
+                        "Give me date-wise award breakdowns.",
+                        "Give me award breakdowns.",
+                        "What is the award budget posted?",
                     ]
+
+                    # Create the response content with the specified formatting
+                    response_content = (
+                        "**Hello! Welcome to the GRANTS AI Assistant!** I'm here to help you explore and analyze grant-related data, answer questions about awards, budgets, and more, or provide insights from documents.\n\n"
+                        "**Here are some questions you can try:**\n\n" +
+                        "\n".join([f"{i}. {question}" for i, question in enumerate(suggested_questions, 1)]) +
+                        "\n\n*Feel free to ask anything, or pick one of the suggested questions to get started!*"
+                    )
+
+                    # Display the response
+                    with response_placeholder:
+                        st.markdown(response_content, unsafe_allow_html=True)
+
+                    # Update assistant_response and session state
+                    assistant_response["content"] = response_content
+                    st.session_state.messages.append({"role": "assistant", "content": assistant_response["content"]})
+                    st.session_state.last_suggestions = suggested_questions
 
                 elif is_greeting or is_suggestion:
                     greeting = original_query.lower().split()[0]
                     if greeting not in ["hi", "hello", "hey", "greet"]:
                         greeting = "hello"
-                    response_content = (
-                        f" Hello! Welcome to the GRANTS AI Assistant!\n I'm here to help you explore and analyze grant-related data, answer questions about awards, budgets, and more, or provide insights from documents.\n
-
-                           Here are some questions you can try:\n
-
-                           1. What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?\n
-                           2. Give me date-wise award breakdowns.\n
-                           3. Give me award breakdowns.\n
-                           4. Show me the Award budget?\n
-                           Feel free to ask anything, or pick one of the suggested questions to get started!
-                    )
-                    with response_placeholder:
-                        st.write_stream(stream_text(response_content))
-                        st.markdown(response_content, unsafe_allow_html=True)
-                    assistant_response["content"] = response_content
-                    st.session_state.last_suggestions = [
+                    
+                    # Define the suggested questions (same as above for consistency)
+                    suggested_questions = [
                         "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
-                        "Give me date wise award breakdowns",
-                        "Give me award breakdowns.t",
-                        "Show me the Award budget",
+                        "Give me date-wise award breakdowns.",
+                        "Give me award breakdowns.",
+                        "What is the award budget posted?",
                     ]
+
+                    # Create the response content with the specified formatting
+                    response_content = (
+                        f"**{greeting.capitalize()}! Welcome to the GRANTS AI Assistant!** I'm here to help you explore and analyze grant-related data, answer questions about awards, budgets, and more, or provide insights from documents.\n\n"
+                        "**Here are some questions you can try:**\n\n" +
+                        "\n".join([f"{i}. {question}" for i, question in enumerate(suggested_questions, 1)]) +
+                        "\n\n*Feel free to ask anything, or pick one of the suggested questions to get started!*"
+                    )
+
+                    # Display the response
+                    with response_placeholder:
+                        st.markdown(response_content, unsafe_allow_html=True)
+
+                    # Update assistant_response and session state
+                    assistant_response["content"] = response_content
+                    st.session_state.last_suggestions = suggested_questions
                     st.session_state.messages.append({"role": "assistant", "content": response_content})
 
                 elif is_complete:
