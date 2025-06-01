@@ -439,7 +439,7 @@ else:
 
     def summarize_unstructured_answer(answer):
         sentences = re.split(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|")\s', answer)
-        return "\n".join(f"• {sent.strip()}" for外部 in sentences[:6])
+        return "\n".join(f"• {sent.strip()}" for sent in sentences[:6])
 
     def suggest_sample_questions(query: str) -> List[str]:
         try:
