@@ -333,7 +333,7 @@ else:
                 st.sidebar.error(f"SQL Error Details: {str(e)}")
             return None
 
-  def is_structured_query(query: str):
+ def is_structured_query(query: str):
     """Check if the query is structured (likely to generate SQL)."""
     structured_patterns = [
         r'\b(count|number|where|group\s+by|order\s+by|sum|avg|max|min|total|how\s+many|which|show|list|summary)\b',
