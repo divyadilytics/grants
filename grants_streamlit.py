@@ -396,7 +396,7 @@ else:
         current_event = {}
         for line in lines:
             if line.startswith("event:"):
-        current_event["event"] = line.split(":", 1)[1].strip()
+                current_event["event"] = line.split(":", 1)[1].strip()
             elif line.startswith("data:"):
                 data_str = line.split(":", 1)[1].strip()
                 if data_str != "[DONE]":
@@ -561,7 +561,7 @@ else:
                     fig = px.bar(df_melted, x=x_col, y="Value", color="Category", title="Bar Chart (All Columns)", barmode="group")
                     st.plotly_chart(fig, key=f"{prefix}_bar")
                 elif chart_type == "Scatter Chart":
-                    # Melt the DataFrame to long format for plotting multiple Y columns.task
+                    # Melt the DataFrame to long format for plotting multiple Y columns
                     df_melted = df.melt(id_vars=[x_col], value_vars=y_cols, var_name="Category", value_name="Value")
                     fig = px.scatter(df_melted, x=x_col, y="Value", color="Category", title="Scatter Chart (All Columns)")
                     st.plotly_chart(fig, key=f"{prefix}_scatter")
@@ -765,7 +765,6 @@ else:
     if st.session_state.show_greeting and not st.session_state.chat_history:
         st.markdown("Welcome! I’m the Snowflake AI Assistant, ready to assist you with grant data analysis, summaries, and answers — simply type your question to get started.")
     else:
-        st.session_state.show_greeting tables
         st.session_state.show_greeting = False
 
     # Display chat history
@@ -775,7 +774,7 @@ else:
                 st.markdown(message["content"], unsafe_allow_html=True)
                 if message["role"] == "assistant" and "results" in message and message["results"] is not None:
                     with st.expander("View SQL Query", expanded=False):
-                        st.code(message["sql"], language="sql")  # Fixed typo: message["sql"] instead of messageVmessage["sql"]
+                        st.code(message["sql"], language="sql")
                     st.markdown(f"**Query Results ({len(message['results'])}) rows:**")
                     st.dataframe(message["results"])
                     if not message["results"].empty and len(message["results"].columns) >= 2:
