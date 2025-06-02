@@ -36,6 +36,49 @@ st.set_page_config(
     initial_sidebar_state="auto"
 )
 
+
+
+# Inject custom CSS to make the title static
+st.markdown("""
+    <style>
+    .static-title {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        background-color: white; /* Adjust background color as needed */
+        z-index: 1000; /* Ensure title stays above other content */
+        padding: 10px 20px;
+        margin: 0;
+        font-size: 24px; /* Match Streamlit's st.title font size */
+        font-weight: bold;
+        border-bottom: 1px solid #f0f2f6; /* Optional: subtle border for separation */
+    }
+    .content {
+        margin-top: 60px; /* Add margin to prevent content from being hidden under the fixed title */
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# --- Main UI ---
+# Display the title in a div with the static-title class
+st.markdown('<div class="static-title">Cortex AI Assistant by DiLytics</div>', unsafe_allow_html=True)
+
+# Semantic model display (remains in the scrollable content)
+semantic_model_filename = SEMANTIC_MODEL.split("/")[-1]  # Assuming SEMANTIC_MODEL is defined
+st.markdown(f"Semantic Model: `{semantic_model_filename}`")
+
+# Initialize service metadata (assuming this is defined elsewhere)
+init_service_metadata()
+
+# Wrap the rest of the content in a div with the content class to apply the margin
+st.markdown('<div class="content">', unsafe_allow_html=True)
+
+# Add the rest of your app's content here (e.g., your chart code or other UI elements)
+# For example, you can include the chart code from your previous message here
+
+st.markdown('</div>', unsafe_allow_html=True)  # Close the content div
+
 # --- Initialize Session State ---
 # Ensure all session state variables are initialized to manage app state
 if "authenticated" not in st.session_state:
