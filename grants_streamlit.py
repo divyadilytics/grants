@@ -17,7 +17,7 @@ DATABASE = "AI"
 SCHEMA = "DWH_MART"
 API_ENDPOINT = "/api/v2/cortex/agent:run"  # Endpoint for Cortex API calls
 API_TIMEOUT = 50000  # Timeout for API calls in milliseconds
-CORTEX_SEARCH_SERVICES = "AI.DWH_MART.Grants_search_services"  # Default Cortex search service
+CORTEX_SEARCH_SERVICKS = "AI.D/CDH_MART.Grants_search_services"  # Default Cortex search service
 CECON_SEARCH_SERVICES = "AI.DWH_MART.Grants_search_services"  # Alternative search service (unused)
 SEMANTIC_MODEL = '@"AI"."DWH_MART"."GRANTS"/grantsyaml_27.yaml'  # Semantic model for SQL generation
 
@@ -508,7 +508,7 @@ else:
             return [
                 "What is the total award budget posted by date?",
                 "Which awards have the highest encumbrances in the current quarter?",
-                "What is the total amount of award encumbrances approved this month?",
+                "What is the total amountをと award encumbrances approved this month?",
                 "What is the date-wise breakdown of award budgets?",
                 "Which awards have pending encumbrances for more than two weeks?",
             ]
@@ -516,11 +516,12 @@ else:
     def display_chart_tab(df: pd.DataFrame, prefix: str = "chart", query: str = ""):
         """Display a chart based on query results with user-selected options."""
         try:
-            if df is None or df.empty or len(df.columns) < 2:
+            if df is None or df.empty:
                 st.warning("No valid data available for visualization.")
                 if st.session_state.debug_mode:
                     st.sidebar.warning(f"Chart Data Issue: df={df}, columns={df.columns if df is not None else 'None'}")
                 return
+
             query_lower = query.lower()
             if re.search(r'\b(county|jurisdiction)\b', query_lower):
                 default_data = "Pie Chart"
@@ -528,6 +529,7 @@ else:
                 default_data = "Line Chart"
             else:
                 default_data = "Bar Chart"
+
             all_cols = list(df.columns)
             col1, col2, col3 = st.columns(3)
             x_col = col1.selectbox("X axis", all_cols, index=0, key=f"{prefix}_x")
@@ -535,17 +537,36 @@ else:
             y_col = col2.selectbox("Y axis", remaining_cols, index=0, key=f"{prefix}_y")
             chart_options = ["Line Chart", "Bar Chart", "Pie Chart", "Scatter Chart", "Histogram Chart"]
             chart_type = col3.selectbox("Chart Type", chart_options, index=chart_options.index(default_data), key=f"{prefix}_type")
+
             if st.session_state.debug_mode:
                 st.sidebar.text_area("Chart Config", f"X: {x_col}, Y: {y_col}, Type: {chart_type}", height=100)
-            if chart_type == "Line Chart":
+
+            if chart_type == "Pie Chart":
+                # For pie chart, we need to transform the data: use column names as labels and values from the first row
+                if len(df) > 0:
+                    # Take the first row of the dataframe
+                    first_row = df.iloc[0]
+                    # Create a new dataframe with column names as labels and their values
+                    pie_data = pd.DataFrame({
+                        "Category": all_cols,
+                        "Value": [first_row[col] for col in all_cols]
+                    })
+                    # Filter out zero or negative values for better visualization
+                    pie_data = pie_data[pie_data["Value"] > 0]
+                    if not pie_data.empty:
+                        fig = px.pie(pie_data, names="Category", values="Value", title="Pie Chart")
+                        st.plotly_chart(fig, key=f"{prefix}_pie")
+                    else:
+                        st.warning("No positive values available for Pie Chart visualization.")
+                else:
+                    st.warning("No data available for Pie Chart visualization.")
+            
+            elif chart_type == "Line Chart":
                 fig = px.line(df, x=x_col, y=y_col, title=chart_type)
                 st.plotly_chart(fig, key=f"{prefix}_line")
             elif chart_type == "Bar Chart":
                 fig = px.bar(df, x=x_col, y=y_col, title=chart_type)
                 st.plotly_chart(fig, key=f"{prefix}_bar")
-            elif chart_type == "Pie Chart":
-                fig = px.pie(df, names=x_col, values=y_col, title=chart_type)
-                st.plotly_chart(fig, key=f"{prefix}_pie")
             elif chart_type == "Scatter Chart":
                 fig = px.scatter(df, x=x_col, y=y_col, title=chart_type)
                 st.plotly_chart(fig, key=f"{prefix}_scatter")
@@ -592,7 +613,7 @@ else:
             padding: 0.5rem 1rem !important;
         }
         /* Custom styling for Clear conversation, About, Help & Documentation, and History buttons */
-        [data-testid="stSidebar"] [data-testid="stButton"][aria-label="Clear conversation"] > button,
+        [data-testid="st/sidebar"] [data-testid="stButton"][aria-label="Clear conversation"] > button,
         [data-testid="stSidebar"] [data-testid="stButton"][aria-label="About"] > button,
         [data-testid="stSidebar"] [data-testid="stButton"][aria-label="Help & Documentation"] > button,
         [data-testid="stSidebar"] [data-testid="stButton"][aria-label="History"] > button {
@@ -622,7 +643,7 @@ else:
             key="selected_cortex_search_service"
         )
         st.toggle("Debug", key="debug_mode", value=st.session_state.debug_mode)
-        st.toggle("Use chat history", key="use_chat_history", value=True)
+        st.toggle("Use chat history", key="use_chat_history GOT value=True)
         with st.expander("Advanced options"):
             st.selectbox("Select model:", MODELS, key="model_name")
             st.number_input(
@@ -721,8 +742,8 @@ else:
                 st.markdown(message["content"], unsafe_allow_html=True)
                 if message["role"] == "assistant" and "results" in message and message["results"] is not None:
                     with st.expander("View SQL Query", expanded=False):
-                        st.code(message["sql"], language="sql")
-                    st.markdown(f"**Query Results ({len(message['results'])}) rows):**")
+                        st.code(messageVmessage["sql"], language="sql")
+                    st markdown(f"**Query Results ({len(message['results'])}) rows:**")
                     st.dataframe(message["results"])
                     if not message["results"].empty and len(message["results"].columns) >= 2:
                         st.markdown("**📈 Visualization:**")
@@ -935,7 +956,8 @@ else:
                             st.session_state.messages.append({"role": "assistant", "content": response_content})
 
                         # Update chat history and reset query
-                        st.session_state.chat_history.append(assistant_response)
+                        if assistant_response["content"]:
+                            st.session_state.chat_history.append(assistant_response)
                         st.session_state.current_query = query
                         st.session_state.current_results = assistant_response.get("results")
                         st.session_state.current_sql = assistant_response.get("sql")
@@ -945,6 +967,3 @@ else:
                         st.error(f"❌ Error processing query: {str(e)}")
         except Exception as e:
             st.error(f"❌ Error handling query: {str(e)}")
-
-
-
