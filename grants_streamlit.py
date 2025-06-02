@@ -324,6 +324,16 @@ else:
                 return None
             columns = df.schema.names
             result_df = pd.DataFrame(data, columns=columns)
+            # Convert numerical columns to plain integers to avoid 'k' formatting
+            for col in result_df.columns:
+                if pd.api.types.is_numeric_dtype(result_df[col]):
+                    # Check if the column name suggests it's an identifier like "award number"
+                    if "award" in col.lower() and "number" in col.lower():
+                        # Convert to integer and then to string to preserve exact value
+                        result_df[col] = result_df[col].astype(float).astype(int).astype(str)
+                    else:
+                        # For other numeric columns, ensure they are floats without formatting
+                        result_df[col] = result_df[col].astype(float)
             if st.session_state.debug_mode:
                 st.sidebar.text_area("Query Results", result_df.to_string(), height=200)
             return result_df
@@ -543,6 +553,12 @@ else:
             if st.session_state.debug_mode:
                 st.sidebar.text_area("Chart Config", f"X: {x_col}, Y: {y_col}, Type: {chart_type}", height=100)
 
+            # Configure axis formatting to avoid 'k' suffix for numerical values
+            axis_layout = {
+                "xaxis": {"tickformat": "d"},  # Use plain numbers for X-axis
+                "yaxis": {"tickformat": "d"}   # Use plain numbers for Y-axis
+            }
+
             # Handle "All Columns" selection for Y-axis
             if y_col == "All Columns" and chart_type in ["Line Chart", "Bar Chart", "Scatter Chart"]:
                 # Plot X-axis against all other columns
@@ -554,16 +570,19 @@ else:
                     # Melt the DataFrame to long format for plotting multiple Y columns
                     df_melted = df.melt(id_vars=[x_col], value_vars=y_cols, var_name="Category", value_name="Value")
                     fig = px.line(df_melted, x=x_col, y="Value", color="Category", title="Line Chart (All Columns)")
+                    fig.update_layout(**axis_layout)
                     st.plotly_chart(fig, key=f"{prefix}_line")
                 elif chart_type == "Bar Chart":
                     # Melt the DataFrame to long format for plotting multiple Y columns
                     df_melted = df.melt(id_vars=[x_col], value_vars=y_cols, var_name="Category", value_name="Value")
                     fig = px.bar(df_melted, x=x_col, y="Value", color="Category", title="Bar Chart (All Columns)", barmode="group")
+                    fig.update_layout(**axis_layout)
                     st.plotly_chart(fig, key=f"{prefix}_bar")
                 elif chart_type == "Scatter Chart":
                     # Melt the DataFrame to long format for plotting multiple Y columns
                     df_melted = df.melt(id_vars=[x_col], value_vars=y_cols, var_name="Category", value_name="Value")
                     fig = px.scatter(df_melted, x=x_col, y="Value", color="Category", title="Scatter Chart (All Columns)")
+                    fig.update_layout(**axis_layout)
                     st.plotly_chart(fig, key=f"{prefix}_scatter")
             else:
                 # Handle single Y-column selection (including fallback for Pie Chart and Histogram Chart)
@@ -577,33 +596,46 @@ else:
                 if chart_type == "Pie Chart":
                     # For pie chart, use column names as labels and values from the first row
                     if len(df) > 0:
-                        # Take the first row of the dataframe
-                        first_row = df.iloc[0]
-                        # Create a new dataframe with column names as labels and their values
-                        pie_data = pd.DataFrame({
-                            "Category": all_cols,
-                            "Value": [first_row[col] for col in all_cols]
-                        })
-                        # Filter out zero or negative values for better visualization
-                        pie_data = pie_data[pie_data["Value"] > 0]
-                        if not pie_data.empty:
-                            fig = px.pie(pie_data, names="Category", values="Value", title="Pie Chart")
-                            st.plotly_chart(fig, key=f"{prefix}_pie")
-                        else:
-                            st.warning("No positive values available for Pie Chart visualization.")
+                        try:
+                            # Take the first row of the dataframe
+                            first_row = df.iloc[0]
+                            # Create a new dataframe with column names as labels and their values
+                            pie_data = pd.DataFrame({
+                                "Category": all_cols,
+                                "Value": [first_row[col] for col in all_cols]
+                            })
+                            # Convert Value column to numeric, coercing errors to NaN
+                            pie_data["Value"] = pd.to_numeric(pie_data["Value"], errors="coerce")
+                            # Drop rows with NaN values in Value
+                            pie_data = pie_data.dropna(subset=["Value"])
+                            # Filter out zero or negative values for better visualization
+                            pie_data = pie_data[pie_data["Value"] > 0]
+                            if not pie_data.empty:
+                                fig = px.pie(pie_data, names="Category", values="Value", title="Pie Chart")
+                                st.plotly_chart(fig, key=f"{prefix}_pie")
+                            else:
+                                st.warning("No positive numeric values available for Pie Chart visualization.")
+                        except Exception as e:
+                            st.error(f"❌ Failed to render Pie Chart: {str(e)}")
+                            if st.session_state.debug_mode:
+                                st.sidebar.error(f"Pie Chart Error Details: {str(e)}")
                     else:
                         st.warning("No data available for Pie Chart visualization.")
                 elif chart_type == "Line Chart":
                     fig = px.line(df, x=x_col, y=y_col, title=chart_type)
+                    fig.update_layout(**axis_layout)
                     st.plotly_chart(fig, key=f"{prefix}_line")
                 elif chart_type == "Bar Chart":
                     fig = px.bar(df, x=x_col, y=y_col, title=chart_type)
+                    fig.update_layout(**axis_layout)
                     st.plotly_chart(fig, key=f"{prefix}_bar")
                 elif chart_type == "Scatter Chart":
                     fig = px.scatter(df, x=x_col, y=y_col, title=chart_type)
+                    fig.update_layout(**axis_layout)
                     st.plotly_chart(fig, key=f"{prefix}_scatter")
                 elif chart_type == "Histogram Chart":
                     fig = px.histogram(df, x=x_col, title=chart_type)
+                    fig.update_layout(**axis_layout)
                     st.plotly_chart(fig, key=f"{prefix}_hist")
         except Exception as e:
             st.error(f"❌ Error generating chart: {str(e)}")
@@ -776,7 +808,15 @@ else:
                     with st.expander("View SQL Query", expanded=False):
                         st.code(message["sql"], language="sql")
                     st.markdown(f"**Query Results ({len(message['results'])}) rows:**")
-                    st.dataframe(message["results"])
+                    # Display DataFrame without 'k' formatting for numerical columns
+                    st.dataframe(
+                        message["results"],
+                        column_config={
+                            col: st.column_config.NumberColumn(format="%d")  # Use plain integer format
+                            for col in message["results"].columns
+                            if pd.api.types.is_numeric_dtype(message["results"][col])
+                        }
+                    )
                     if not message["results"].empty and len(message["results"].columns) >= 2:
                         st.markdown("**📈 Visualization:**")
                         display_chart_tab(message["results"], prefix=f"chart_{hash(message['content'])}", query=message.get("query", ""))
@@ -913,7 +953,14 @@ else:
                                     with st.expander("View SQL Query", expanded=False):
                                         st.code(sql, language="sql")
                                     st.markdown(f"**Query Results ({len(results)} rows):**")
-                                    st.dataframe(results)
+                                    st.dataframe(
+                                        results,
+                                        column_config={
+                                            col: st.column_config.NumberColumn(format="%d")
+                                            for col in results.columns
+                                            if pd.api.types.is_numeric_dtype(results[col])
+                                        }
+                                    )
                                     if len(results.columns) >= 2:
                                         st.markdown("**📈 Visualization:**")
                                         display_chart_tab(results, prefix=f"chart_{hash(query)}", query=query)
