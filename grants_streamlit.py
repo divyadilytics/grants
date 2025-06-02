@@ -289,8 +289,8 @@ else:
             # Convert numerical columns appropriately
             for col in result_df.columns:
                 if pd.api.types.is_numeric_dtype(result_df[col]):
-                    # Check if the column is an "award number"
-                    if "award" in col.lower() and "number" in col.lower():
+                    # Check if the column is an "award number" (adjust condition as needed)
+                    if "award" in col.lower() and ("number" in col.lower() or "num" in col.lower() or "id" in col.lower()):
                         # Convert to integer and then to string to preserve exact value
                         result_df[col] = result_df[col].astype(float).astype(int).astype(str)
                     else:
@@ -298,6 +298,7 @@ else:
                         result_df[col] = result_df[col].astype(float)
             if st.session_state.debug_mode:
                 st.sidebar.text_area("Query Results", result_df.to_string(), height=200)
+                st.sidebar.write("DataFrame dtypes:", result_df.dtypes)
             return result_df
         except Exception as e:
             st.error(f"❌ SQL Execution Error: {str(e)}")
@@ -502,6 +503,7 @@ else:
 
             if st.session_state.debug_mode:
                 st.sidebar.text_area("Chart Config", f"X: {x_col}, Y: {y_col}, Type: {chart_type}", height=100)
+                st.sidebar.write("DataFrame dtypes:", df.dtypes)
 
             # Configure axis formatting to avoid 'k' suffix
             axis_layout = {
@@ -511,11 +513,14 @@ else:
 
             # Handle "All Columns" for Y-axis
             if y_col == "All Columns":
+                numeric_cols = [c for c in remaining_cols if pd.api.types.is_numeric_dtype(df[c])]
+                if not numeric_cols:
+                    st.warning("No numeric columns available for 'All Columns' visualization.")
+                    if st.session_state.debug_mode:
+                        st.sidebar.warning("No numeric columns found for 'All Columns'.")
+                    return
                 if chart_type in ["Line Chart", "Bar Chart", "Scatter Chart"]:
-                    y_cols = remaining_cols
-                    if not y_cols:
-                        st.warning("No Y-axis columns available for visualization.")
-                        return
+                    y_cols = numeric_cols
                     # Melt the DataFrame to long format for plotting multiple Y columns
                     df_melted = df.melt(id_vars=[x_col], value_vars=y_cols, var_name="Category", value_name="Value")
                     if chart_type == "Line Chart":
@@ -531,10 +536,9 @@ else:
                         fig.update_layout(**axis_layout)
                         st.plotly_chart(fig, key=f"{prefix}_scatter")
                 elif chart_type == "Pie Chart":
-                    # For Pie Chart, sum all columns (except X-axis) for each row
+                    # For Pie Chart, sum all numeric columns (except X-axis) for each row
                     if len(df) > 0:
-                        # Create a new column summing all columns except the X-axis
-                        df['Total'] = df[remaining_cols].sum(axis=1, numeric_only=True)
+                        df['Total'] = df[numeric_cols].sum(axis=1)
                         fig = px.pie(df, names=x_col, values='Total', title=f"{chart_type} (All Columns)")
                         fig.update_layout(**axis_layout)
                         st.plotly_chart(fig, key=f"{prefix}_pie")
@@ -726,7 +730,7 @@ else:
                         col: st.column_config.NumberColumn(format="%d")  # Plain integer format
                         for col in message["results"].columns
                         if pd.api.types.is_numeric_dtype(message["results"][col])
-                        and not ("award" in col.lower() and "number" in col.lower())
+                        and not ("award" in col.lower() and ("number" in col.lower() or "num" in col.lower() or "id" in col.lower()))
                     }
                     st.dataframe(message["results"], column_config=column_config)
                     if not message["results"].empty and len(message["results"].columns) >= 2:
@@ -853,7 +857,7 @@ else:
                                         col: st.column_config.NumberColumn(format="%d")
                                         for col in results.columns
                                         if pd.api.types.is_numeric_dtype(results[col])
-                                        and not ("award" in col.lower() and "number" in col.lower())
+                                        and not ("award" in col.lower() and ("number" in col.lower() or "num" in col.lower() or "id" in col.lower()))
                                     }
                                     st.dataframe(results, column_config=column_config)
                                     if len(results.columns) >= 2:
