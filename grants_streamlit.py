@@ -18,7 +18,7 @@ SCHEMA = "DWH_MART"
 API_ENDPOINT = "/api/v2/cortex/agent:run"  # Endpoint for Cortex API calls
 API_TIMEOUT = 50000  # Timeout for API calls in milliseconds
 CORTEX_SEARCH_SERVICES = "AI.DWH_MART.Grants_search_services"  # Default Cortex search service
-CECON_SEARCH_SERVICES = "AI.DWH_MART.Grants_search_services"  # Alternative search service (unused)
+
 SEMANTIC_MODEL = '@"AI"."DWH_MART"."GRANTS"/grantsyaml_27.yaml'  # Semantic model for SQL generation
 
 # Available LLMs for Cortex
