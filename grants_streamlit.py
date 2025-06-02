@@ -17,7 +17,7 @@ DATABASE = "AI"
 SCHEMA = "DWH_MART"
 API_ENDPOINT = "/api/v2/cortex/agent:run"  # Endpoint for Cortex API calls
 API_TIMEOUT = 50000  # Timeout for API calls in milliseconds
-CORTEX_SEARCH_SERVICKS = "AI.D/CDH_MART.Grants_search_services"  # Default Cortex search service
+CORTEX_SEARCH_SERVICES = "AI.DWH_MART.Grants_search_services"  # Default Cortex search service
 CECON_SEARCH_SERVICES = "AI.DWH_MART.Grants_search_services"  # Alternative search service (unused)
 SEMANTIC_MODEL = '@"AI"."DWH_MART"."GRANTS"/grantsyaml_27.yaml'  # Semantic model for SQL generation
 
@@ -396,7 +396,7 @@ else:
         current_event = {}
         for line in lines:
             if line.startswith("event:"):
-                current_event["event"] = line.split(":", 1)[1].strip()
+        current_event["event"] = line.split(":", 1)[1].strip()
             elif line.startswith("data:"):
                 data_str = line.split(":", 1)[1].strip()
                 if data_str != "[DONE]":
@@ -508,7 +508,7 @@ else:
             return [
                 "What is the total award budget posted by date?",
                 "Which awards have the highest encumbrances in the current quarter?",
-                "What is the total amountをと award encumbrances approved this month?",
+                "What is the total amount of award encumbrances approved this month?",
                 "What is the date-wise breakdown of award budgets?",
                 "Which awards have pending encumbrances for more than two weeks?",
             ]
@@ -534,45 +534,77 @@ else:
             col1, col2, col3 = st.columns(3)
             x_col = col1.selectbox("X axis", all_cols, index=0, key=f"{prefix}_x")
             remaining_cols = [c for c in all_cols if c != x_col]
-            y_col = col2.selectbox("Y axis", remaining_cols, index=0, key=f"{prefix}_y")
+            # Add "All Columns" option to the Y-axis dropdown
+            y_options = ["All Columns"] + remaining_cols
+            y_col = col2.selectbox("Y axis", y_options, index=0, key=f"{prefix}_y")
             chart_options = ["Line Chart", "Bar Chart", "Pie Chart", "Scatter Chart", "Histogram Chart"]
             chart_type = col3.selectbox("Chart Type", chart_options, index=chart_options.index(default_data), key=f"{prefix}_type")
 
             if st.session_state.debug_mode:
                 st.sidebar.text_area("Chart Config", f"X: {x_col}, Y: {y_col}, Type: {chart_type}", height=100)
 
-            if chart_type == "Pie Chart":
-                # For pie chart, we need to transform the data: use column names as labels and values from the first row
-                if len(df) > 0:
-                    # Take the first row of the dataframe
-                    first_row = df.iloc[0]
-                    # Create a new dataframe with column names as labels and their values
-                    pie_data = pd.DataFrame({
-                        "Category": all_cols,
-                        "Value": [first_row[col] for col in all_cols]
-                    })
-                    # Filter out zero or negative values for better visualization
-                    pie_data = pie_data[pie_data["Value"] > 0]
-                    if not pie_data.empty:
-                        fig = px.pie(pie_data, names="Category", values="Value", title="Pie Chart")
-                        st.plotly_chart(fig, key=f"{prefix}_pie")
+            # Handle "All Columns" selection for Y-axis
+            if y_col == "All Columns" and chart_type in ["Line Chart", "Bar Chart", "Scatter Chart"]:
+                # Plot X-axis against all other columns
+                y_cols = remaining_cols
+                if not y_cols:
+                    st.warning("No Y-axis columns available for visualization.")
+                    return
+                if chart_type == "Line Chart":
+                    # Melt the DataFrame to long format for plotting multiple Y columns
+                    df_melted = df.melt(id_vars=[x_col], value_vars=y_cols, var_name="Category", value_name="Value")
+                    fig = px.line(df_melted, x=x_col, y="Value", color="Category", title="Line Chart (All Columns)")
+                    st.plotly_chart(fig, key=f"{prefix}_line")
+                elif chart_type == "Bar Chart":
+                    # Melt the DataFrame to long format for plotting multiple Y columns
+                    df_melted = df.melt(id_vars=[x_col], value_vars=y_cols, var_name="Category", value_name="Value")
+                    fig = px.bar(df_melted, x=x_col, y="Value", color="Category", title="Bar Chart (All Columns)", barmode="group")
+                    st.plotly_chart(fig, key=f"{prefix}_bar")
+                elif chart_type == "Scatter Chart":
+                    # Melt the DataFrame to long format for plotting multiple Y columns.task
+                    df_melted = df.melt(id_vars=[x_col], value_vars=y_cols, var_name="Category", value_name="Value")
+                    fig = px.scatter(df_melted, x=x_col, y="Value", color="Category", title="Scatter Chart (All Columns)")
+                    st.plotly_chart(fig, key=f"{prefix}_scatter")
+            else:
+                # Handle single Y-column selection (including fallback for Pie Chart and Histogram Chart)
+                if y_col == "All Columns":
+                    # Default to the first remaining column for chart types that don't support multiple Y columns
+                    y_col = remaining_cols[0] if remaining_cols else None
+                    if not y_col:
+                        st.warning("No Y-axis columns available for visualization.")
+                        return
+
+                if chart_type == "Pie Chart":
+                    # For pie chart, use column names as labels and values from the first row
+                    if len(df) > 0:
+                        # Take the first row of the dataframe
+                        first_row = df.iloc[0]
+                        # Create a new dataframe with column names as labels and their values
+                        pie_data = pd.DataFrame({
+                            "Category": all_cols,
+                            "Value": [first_row[col] for col in all_cols]
+                        })
+                        # Filter out zero or negative values for better visualization
+                        pie_data = pie_data[pie_data["Value"] > 0]
+                        if not pie_data.empty:
+                            fig = px.pie(pie_data, names="Category", values="Value", title="Pie Chart")
+                            st.plotly_chart(fig, key=f"{prefix}_pie")
+                        else:
+                            st.warning("No positive values available for Pie Chart visualization.")
                     else:
-                        st.warning("No positive values available for Pie Chart visualization.")
-                else:
-                    st.warning("No data available for Pie Chart visualization.")
-            
-            elif chart_type == "Line Chart":
-                fig = px.line(df, x=x_col, y=y_col, title=chart_type)
-                st.plotly_chart(fig, key=f"{prefix}_line")
-            elif chart_type == "Bar Chart":
-                fig = px.bar(df, x=x_col, y=y_col, title=chart_type)
-                st.plotly_chart(fig, key=f"{prefix}_bar")
-            elif chart_type == "Scatter Chart":
-                fig = px.scatter(df, x=x_col, y=y_col, title=chart_type)
-                st.plotly_chart(fig, key=f"{prefix}_scatter")
-            elif chart_type == "Histogram Chart":
-                fig = px.histogram(df, x=x_col, title=chart_type)
-                st.plotly_chart(fig, key=f"{prefix}_hist")
+                        st.warning("No data available for Pie Chart visualization.")
+                elif chart_type == "Line Chart":
+                    fig = px.line(df, x=x_col, y=y_col, title=chart_type)
+                    st.plotly_chart(fig, key=f"{prefix}_line")
+                elif chart_type == "Bar Chart":
+                    fig = px.bar(df, x=x_col, y=y_col, title=chart_type)
+                    st.plotly_chart(fig, key=f"{prefix}_bar")
+                elif chart_type == "Scatter Chart":
+                    fig = px.scatter(df, x=x_col, y=y_col, title=chart_type)
+                    st.plotly_chart(fig, key=f"{prefix}_scatter")
+                elif chart_type == "Histogram Chart":
+                    fig = px.histogram(df, x=x_col, title=chart_type)
+                    st.plotly_chart(fig, key=f"{prefix}_hist")
         except Exception as e:
             st.error(f"❌ Error generating chart: {str(e)}")
             if st.session_state.debug_mode:
@@ -613,7 +645,7 @@ else:
             padding: 0.5rem 1rem !important;
         }
         /* Custom styling for Clear conversation, About, Help & Documentation, and History buttons */
-        [data-testid="st/sidebar"] [data-testid="stButton"][aria-label="Clear conversation"] > button,
+        [data-testid="stSidebar"] [data-testid="stButton"][aria-label="Clear conversation"] > button,
         [data-testid="stSidebar"] [data-testid="stButton"][aria-label="About"] > button,
         [data-testid="stSidebar"] [data-testid="stButton"][aria-label="Help & Documentation"] > button,
         [data-testid="stSidebar"] [data-testid="stButton"][aria-label="History"] > button {
@@ -643,7 +675,7 @@ else:
             key="selected_cortex_search_service"
         )
         st.toggle("Debug", key="debug_mode", value=st.session_state.debug_mode)
-        st.toggle("Use chat history", key="use_chat_history GOT value=True)
+        st.toggle("Use chat history", key="use_chat_history", value=True)
         with st.expander("Advanced options"):
             st.selectbox("Select model:", MODELS, key="model_name")
             st.number_input(
@@ -733,6 +765,7 @@ else:
     if st.session_state.show_greeting and not st.session_state.chat_history:
         st.markdown("Welcome! I’m the Snowflake AI Assistant, ready to assist you with grant data analysis, summaries, and answers — simply type your question to get started.")
     else:
+        st.session_state.show_greeting tables
         st.session_state.show_greeting = False
 
     # Display chat history
@@ -742,8 +775,8 @@ else:
                 st.markdown(message["content"], unsafe_allow_html=True)
                 if message["role"] == "assistant" and "results" in message and message["results"] is not None:
                     with st.expander("View SQL Query", expanded=False):
-                        st.code(messageVmessage["sql"], language="sql")
-                    st markdown(f"**Query Results ({len(message['results'])}) rows:**")
+                        st.code(message["sql"], language="sql")  # Fixed typo: message["sql"] instead of messageVmessage["sql"]
+                    st.markdown(f"**Query Results ({len(message['results'])}) rows:**")
                     st.dataframe(message["results"])
                     if not message["results"].empty and len(message["results"].columns) >= 2:
                         st.markdown("**📈 Visualization:**")
