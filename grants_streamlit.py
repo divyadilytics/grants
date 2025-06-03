@@ -666,14 +666,11 @@ else:
     st.sidebar.subheader("Sample Questions")
     sample_questions = [
         "posted budget by award number",
-        "give me year wise total award budget posted,actual award posted,award ecumbrance posted,award encumbrance approved",
         "give me award breakdown",
         "give me year wise award budget posted and award budget approved",
         "sums of actual posted,budget posted,encumbrance approved,encumbrancepending by award full name",
         "top 5 grants with there award names",
-        "show me sum of task actual posted by award name",
-        "In which year the first grant approved",
-        "total burdened cost vs total raw cost"
+        "show me sum of task actual posted by award name"
     ]
 
     # Display chat history without chat bubbles for assistant, skipping the welcome message
