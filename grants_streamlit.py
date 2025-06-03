@@ -1063,22 +1063,25 @@ else:
 
     if search_results:
         prompt_context = "\n".join(search_results)
-        summary = complete(st.session_state.model_name, f"""
-[INST]
-You are a helpful assistant. Answer the question below using **only** the document context provided.
+        prompt = f"""
+        [INST]
+        You are a helpful assistant. Answer the question below using **only** the document context provided.
 
-If the context does not contain the answer, reply:
-"I couldn't find relevant information in the documents provided."
+        If the context does not contain the answer, reply:
+       "I couldn't find relevant information in the documents provided."
 
-<context>
-{prompt_context}
-</context>
-<question>
-{combined_query}
-</question>
-[/INST]
-Answer:
-""")
+        <context>
+        {prompt_context}
+        </context>
+        <question>
+        {combined_query}
+        </question>
+        [/INST]
+        Answer:
+        """
+
+summary = complete(st.session_state.model_name, prompt)
+
         response_content = f"**Answer:**\n{summary}"
         response_placeholder.markdown(response_content, unsafe_allow_html=True)
         assistant_response["content"] = response_content
