@@ -114,7 +114,7 @@ st.markdown("""
 
 /* Global app container */
 .stApp {
-    padding-top: 80px !important; /* Reduced from 100px to minimize top spacing */
+    padding-top: 80px !important;
 }
 
 /* Fixed header styling */
@@ -125,18 +125,18 @@ st.markdown("""
     right: 20px;
     z-index: 999;
     background-color: #ffffff;
-    padding: 8px 10px; /* Reduced padding for tighter spacing */
+    padding: 8px 10px;
     text-align: center;
     pointer-events: none;
 }
 .fixed-header h1 {
-    font-size: 28px !important; /* Slightly smaller for better fit */
+    font-size: 28px !important;
     color: #29B5E8;
-    margin: 0 0 2px 0 !important; /* Reduced margin */
+    margin: 0 0 2px 0 !important;
     font-weight: 600 !important;
 }
 .fixed-header p {
-    font-size: 16px !important; /* Slightly smaller for better fit */
+    font-size: 16px !important;
     color: #333;
     margin: 0 !important;
     font-weight: 400 !important;
@@ -165,12 +165,12 @@ st.markdown("""
     white-space: pre-wrap !important;
     word-wrap: break-word !important;
     overflow: hidden !important;
-    margin-bottom: 10px !important; /* Reduced from 20px */
-    padding: 8px !important; /* Reduced padding for tighter spacing */
+    margin-bottom: 10px !important;
+    padding: 8px !important;
     border-radius: 8px !important;
     text-align: left !important;
-    font-size: 15px !important; /* Consistent font size */
-    line-height: 1.5 !important; /* Improved readability */
+    font-size: 15px !important;
+    line-height: 1.5 !important;
     width: 100% !important;
 }
 [data-testid="stChatMessageContent"] {
@@ -182,7 +182,7 @@ st.markdown("""
     text-align: left !important;
     padding-left: 0 !important;
     margin-left: 0 !important;
-    font-size: 15px !important; /* Consistent font size */
+    font-size: 15px !important;
     line-height: 1.5 !important;
 }
 
@@ -191,7 +191,7 @@ st.markdown("""
     text-align: left !important;
     width: 100% !important;
     margin: 0 auto !important;
-    font-size: 14px !important; /* Slightly smaller for dataframes */
+    font-size: 14px !important;
     line-height: 1.4 !important;
 }
 
@@ -199,13 +199,13 @@ st.markdown("""
 [data-testid="stMarkdown"] {
     text-align: left !important;
     width: 100% !important;
-    padding: 3px 0 !important; /* Reduced padding */
-    font-size: 15px !important; /* Consistent font size */
+    padding: 3px 0 !important;
+    font-size: 15px !important;
     line-height: 1.5 !important;
 }
 [data-testid="stMarkdown"] h1, [data-testid="stMarkdown"] h2, [data-testid="stMarkdown"] h3 {
     font-weight: 600 !important;
-    margin: 5px 0 !important; /* Reduced margin for tighter spacing */
+    margin: 5px 0 !important;
 }
 
 /* Hide copy buttons */
@@ -215,7 +215,7 @@ st.markdown("""
 
 /* Sidebar styling */
 [data-testid="stSidebar"] {
-    padding: 10px !important; /* Reduced padding */
+    padding: 10px !important;
 }
 [data-testid="stSidebar"] [data-testid="stButton"] > button {
     background-color: #29B5E8 !important;
@@ -223,7 +223,7 @@ st.markdown("""
     font-weight: 600 !important;
     width: 100% !important;
     border-radius: 0px !important;
-    margin: 2px 0 !important; /* Reduced margin between buttons */
+    margin: 2px 0 !important;
     border: none !important;
     padding: 0.5rem 1rem !important;
     font-size: 14px !important;
@@ -242,7 +242,7 @@ st.markdown("""
     line-height: 1.4 !important;
 }
 [data-testid="stSidebar"] [data-testid="stExpander"] {
-    margin: 5px 0 !important; /* Reduced margin */
+    margin: 5px 0 !important;
 }
 [data-testid="stSidebar"] [data-testid="stMarkdown"] {
     font-size: 14px !important;
@@ -441,14 +441,22 @@ else:
                 return None
             columns = df.columns
             result_df = pd.DataFrame(data, columns=columns)
-            # Debug: Print column names to identify the correct award number column
+            # Debug: Print column names to identify the correct award number and date columns
             if st.session_state.debug_mode:
                 st.write("Debug - DataFrame Columns:", result_df.columns.tolist())
-            # Ensure award number columns are treated as integers
+            # Convert award number columns to strings to prevent 'k' formatting
             award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO"]
             for col in award_number_candidates:
                 if col in result_df.columns:
-                    result_df[col] = result_df[col].astype('Int64').fillna(0).astype(int)
+                    result_df[col] = result_df[col].astype(str)
+            # Format date columns to YYYY-MM-DD
+            date_column_candidates = ["DATE", "AWARD_DATE", "SUBMITTED_AT", "DW_DATE_ALLOCATED_KEY"]
+            for col in result_df.columns:
+                if col in date_column_candidates or "DATE" in col.upper():
+                    try:
+                        result_df[col] = pd.to_datetime(result_df[col]).dt.strftime('%Y-%m-%d')
+                    except (ValueError, TypeError):
+                        continue  # Skip if the column can't be converted to datetime
             return result_df
         except Exception as e:
             st.error(f"Error executing SQL query: {str(e)}")
@@ -809,10 +817,18 @@ else:
                     st.code(message["sql"], language="sql")
                 st.markdown(f"**Query Results ({len(message['results'])} rows):**")
                 df_to_display = message["results"].copy()
+                # Ensure award numbers are strings and dates are in YYYY-MM-DD format
                 award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO"]
                 for col in award_number_candidates:
                     if col in df_to_display.columns:
-                        df_to_display[col] = df_to_display[col].astype('Int64').fillna(0).astype(int)
+                        df_to_display[col] = df_to_display[col].astype(str)
+                date_column_candidates = ["DATE", "AWARD_DATE", "SUBMITTED_AT", "DW_DATE_ALLOCATED_KEY"]
+                for col in df_to_display.columns:
+                    if col in date_column_candidates or "DATE" in col.upper():
+                        try:
+                            df_to_display[col] = pd.to_datetime(df_to_display[col]).dt.strftime('%Y-%m-%d')
+                        except (ValueError, TypeError):
+                            continue
                 st.dataframe(df_to_display)
                 if not df_to_display.empty and len(df_to_display.columns) >= 2:
                     st.markdown("**📈 Visualization:**")
@@ -939,10 +955,18 @@ else:
                                 st.code(sql, language="sql")
                             st.markdown(f"**Query Results ({len(results)} rows):**")
                             df_to_display = results.copy()
+                            # Ensure award numbers are strings and dates are in YYYY-MM-DD format
                             award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO"]
                             for col in award_number_candidates:
                                 if col in df_to_display.columns:
-                                    df_to_display[col] = df_to_display[col].astype('Int64').fillna(0).astype(int)
+                                    df_to_display[col] = df_to_display[col].astype(str)
+                            date_column_candidates = ["DATE", "AWARD_DATE", "SUBMITTED_AT", "DW_DATE_ALLOCATED_KEY"]
+                            for col in df_to_display.columns:
+                                if col in date_column_candidates or "DATE" in col.upper():
+                                    try:
+                                        df_to_display[col] = pd.to_datetime(df_to_display[col]).dt.strftime('%Y-%m-%d')
+                                    except (ValueError, TypeError):
+                                        continue
                             st.dataframe(df_to_display)
                             if len(df_to_display.columns) >= 2:
                                 st.markdown("**📈 Visualization:**")
