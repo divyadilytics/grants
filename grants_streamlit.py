@@ -263,14 +263,6 @@ def stream_text(text: str, chunk_size: int = 2, delay: float = 0.04):
     for i in range(0, len(text), chunk_size):
         yield text[i:i + chunk_size]
         time.sleep(delay)
-def extract_keywords_from_query(query: str, top_n: int = 5) -> List[str]:
-    stopwords = {
-        "what", "which", "is", "the", "a", "an", "are", "how", "much", "many", "who", "does", "do",
-        "get", "have", "has", "i", "we", "they", "you", "can", "be", "to", "from","metric","raw cost metric"
-    }
-    words = re.findall(r'\b\w+\b', query.lower())
-    keywords = [word for word in words if word not in stopwords and len(word) > 2]
-    return keywords[:top_n]
 
 def submit_grant_application(grant_id: str, applicant_name: str, application_details: str):
     try:
@@ -317,31 +309,26 @@ def init_service_metadata():
 
 def query_cortex_search_service(query):
     try:
-        keywords = extract_keywords_from_query(query)
-        keyword_boost = " ".join(keywords)
-        enhanced_query = f"{query}. Keywords: {keyword_boost}" if keyword_boost else query
-
         db, schema = session.get_current_database(), session.get_current_schema()
         root = Root(session)
         cortex_search_service = (
             root.databases[db]
             .schemas[schema]
-            .cortex_search_services[st.session_state.selected_cortex_search_service.split('.')[-1]]
+            .cortex_search_services["AI.DWH_MART.GRANTS_SEARCH_SERVICES"]
         )
-
         context_documents = cortex_search_service.search(
-            enhanced_query, columns=[], limit=st.session_state.num_retrieved_chunks
+            query, columns=[], limit=st.session_state.num_retrieved_chunks
         )
         results = context_documents.results
-        search_col = st.session_state.service_metadata[0]["search_column"]
+        service_metadata = st.session_state.service_metadata
+        search_col = service_metadata[0]["search_column"]
         context_str = ""
         for i, r in enumerate(results):
-            context_str += f"Context document {i+1}: {r[search_col]} \n\n"
-        return context_str.strip()
+            context_str += f"Context document {i+1}: {r[search_col]} \n"
+        return context_str
     except Exception as e:
         st.error(f"❌ Error querying Cortex Search service: {str(e)}")
         return ""
-
 
 def get_chat_history():
     start_index = max(0, len(st.session_state.chat_history) - st.session_state.num_chat_messages)
@@ -388,27 +375,21 @@ def create_prompt(user_question):
     if not prompt_context.strip():
         return complete(st.session_state.model_name, user_question)
     
-        prompt = f"""
+    prompt = f"""
         [INST]
-         You are a helpful AI assistant for grants management. You must answer **only using** the context provided below. 
-
-         If the context is not sufficient, respond with:
-         "I couldn't find relevant information in the documents provided."
-            
-         <chat_history>
-            {chat_history_str}
-            </chat_history>
-            <context>
-            {prompt_context}
-            </context>
-<question>
-{user_question}
-</question>
-[/INST]
-Answer:
-"""
-
-
+        You are a helpful AI chat assistant for grants management. Use the provided context and chat history to provide a coherent, concise, and relevant answer to the user's question.
+        <chat_history>
+        {chat_history_str}
+        </chat_history>
+        <context>
+        {prompt_context}
+        </context>
+        <question>
+        {user_question}
+        </question>
+        [/INST]
+        Answer:
+    """
     return complete(st.session_state.model_name, prompt)
 
 def get_user_questions(limit=10):
@@ -1057,41 +1038,19 @@ else:
                         failed_response = True
                         assistant_response["content"] = response_content
 
-                    elif st.session_state.data_source == "Document":
-                        response = snowflake_api_call(combined_query, is_structured=False)
-                         _, search_results = process_sse_response(response, is_structured=False)
-
+                elif st.session_state.data_source == "Document":
+                    response = snowflake_api_call(combined_query, is_structured=False)
+                    _, search_results = process_sse_response(response, is_structured=False)
                     if search_results:
-        prompt_context = "\n".join(search_results)
-        prompt = f"""
-        [INST]
-        You are a helpful assistant. Answer the question below using **only** the document context provided.
-
-        If the context does not contain the answer, reply:
-       "I couldn't find relevant information in the documents provided."
-
-        <context>
-        {prompt_context}
-        </context>
-        <question>
-        {combined_query}
-        </question>
-        [/INST]
-        Answer:
-        """
-
-summary = complete(st.session_state.model_name, prompt)
-
-        response_content = f"**Answer:**\n{summary}"
-        response_placeholder.markdown(response_content, unsafe_allow_html=True)
-        assistant_response["content"] = response_content
-        st.session_state.messages.append({"role": "assistant", "content": response_content})
-    else:
-        response_content = "I couldn't find relevant information in the documents provided."
-        response_placeholder.markdown(response_content, unsafe_allow_html=True)
-        assistant_response["content"] = response_content
-        st.session_state.messages.append({"role": "assistant", "content": response_content})
-
+                        raw_result = search_results[0]
+                        summary = create_prompt(combined_query)
+                        if summary:
+                            response_content = f"**Answer:**\n{summary}"
+                        else:
+                            response_content = f"**Key Information:**\n{summarize_unstructured_answer(raw_result)}"
+                        response_placeholder.markdown(response_content, unsafe_allow_html=True)
+                        assistant_response["content"] = response_content
+                        st.session_state.messages.append({"role": "assistant", "content": response_content})
                     else:
                         failed_response = True
 
