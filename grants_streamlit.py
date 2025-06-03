@@ -1073,3 +1073,4 @@ else:
                 st.session_state.previous_sql = assistant_response.get("sql")
                 st.session_state.previous_results = assistant_response.get("results")
                 st.session_state.query = None
+                
