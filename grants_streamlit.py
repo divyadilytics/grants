@@ -105,6 +105,14 @@ st.markdown("""
     right: 10px;
     z-index: 1000;
 }
+/* Style for the assistant's response */
+.assistant-response {
+    font-family: Arial, sans-serif !important;
+    font-size: 16px !important;
+    line-height: 1.5 !important;
+    text-align: left !important;
+    font-style: normal !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -648,8 +656,6 @@ else:
     st.markdown(f"Semantic Model: `{semantic_model_filename}`")
     init_service_metadata()
 
-   
-
     st.sidebar.subheader("Sample Questions")
     sample_questions = [
         "posted budget by award number",
@@ -673,7 +679,7 @@ else:
                 st.markdown(f"**You:** {message['content']}", unsafe_allow_html=True)
         else:
             with st.chat_message("assistant"):
-                st.markdown(message["content"], unsafe_allow_html=True)
+                st.markdown(f'<div class="assistant-response">{message["content"]}</div>', unsafe_allow_html=True)
             if "results" in message and message["results"] is not None:
                 with st.expander("View SQL Query", expanded=False):
                     st.code(message["sql"], language="sql")
@@ -737,7 +743,7 @@ else:
                 response_content += "\nFeel free to ask any of these or come up with your own related to PBCS data!"
                 with response_placeholder:
                     with st.chat_message("assistant"):
-                        st.markdown(response_content, unsafe_allow_html=True)
+                        st.markdown(f'<div class="assistant-response">{response_content}</div>', unsafe_allow_html=True)
                 assistant_response["content"] = response_content
                 st.session_state.last_suggestions = sample_questions[:5]
                 st.session_state.messages.append({"role": "assistant", "content": response_content})
@@ -750,7 +756,7 @@ else:
                 response_content += "\nFeel free to ask any of these or come up with your own related to PBCS data!"
                 with response_placeholder:
                     with st.chat_message("assistant"):
-                        st.markdown(response_content, unsafe_allow_html=True)
+                        st.markdown(f'<div class="assistant-response">{response_content}</div>', unsafe_allow_html=True)
                 assistant_response["content"] = response_content
                 st.session_state.last_suggestions = sample_questions[:5]
                 st.session_state.messages.append({"role": "assistant", "content": response_content})
@@ -765,7 +771,7 @@ else:
                 response_content += "\nFeel free to ask any of these or rephrase your question!"
                 with response_placeholder:
                     with st.chat_message("assistant"):
-                        st.markdown(response_content, unsafe_allow_html=True)
+                        st.markdown(f'<div class="assistant-response">{response_content}</div>', unsafe_allow_html=True)
                 assistant_response["content"] = response_content
                 st.session_state.messages.append({"role": "assistant", "content": response_content})
                 st.session_state.chat_history.append(assistant_response)
@@ -781,7 +787,7 @@ else:
                     response_content = response
                     with response_placeholder:
                         with st.chat_message("assistant"):
-                            st.markdown(response_content, unsafe_allow_html=True)
+                            st.markdown(f'<div class="assistant-response">{response_content}</div>', unsafe_allow_html=True)
                     assistant_response["content"] = response_content
                     st.session_state.messages.append({"role": "assistant", "content": response_content})
                 else:
@@ -794,7 +800,7 @@ else:
                     response_content = summary
                     with response_placeholder:
                         with st.chat_message("assistant"):
-                            st.markdown(response_content, unsafe_allow_html=True)
+                            st.markdown(f'<div class="assistant-response">{response_content}</div>', unsafe_allow_html=True)
                     assistant_response["content"] = response_content
                     st.session_state.messages.append({"role": "assistant", "content": response_content})
                 else:
@@ -808,14 +814,19 @@ else:
                     results = run_snowflake_query(sql)
                     if results is not None and not results.empty:
                         results_text = results.to_string(index=False)
-                        prompt = f"Provide a concise natural language answer to the query '{query}' using the following data, avoiding phrases like 'Based on the query results':\n\n{results_text}"
+                        prompt = f"""
+                        Provide a concise natural language answer to the query '{query}' using the following data. Format the response as a series of sentences, one for each award number, in the format: "The budget posted for award number [award_number] is [amount]." For the last award number, use: "Lastly, the posted budget for award number [award_number] is [amount]." Make the award numbers bold using Markdown syntax (e.g., **41001**). Avoid phrases like 'Based on the query results'. Ensure proper spacing and punctuation between sentences.
+
+                        Data:
+                        {results_text}
+                        """
                         summary = complete(st.session_state.model_name, prompt)
                         if not summary:
                             summary = "⚠️ Unable to generate a natural language summary."
                         response_content = summary
                         with response_placeholder:
                             with st.chat_message("assistant"):
-                                st.markdown(response_content, unsafe_allow_html=True)
+                                st.markdown(f'<div class="assistant-response">{response_content}</div>', unsafe_allow_html=True)
                         with st.expander("View SQL Query", expanded=False):
                             st.code(sql, language="sql")
                         st.markdown(f"**Query Results ({len(results)} rows):**")
@@ -855,7 +866,7 @@ else:
                         response_content = summarize_unstructured_answer(raw_result)
                     with response_placeholder:
                         with st.chat_message("assistant"):
-                            st.markdown(response_content, unsafe_allow_html=True)
+                            st.markdown(f'<div class="assistant-response">{response_content}</div>', unsafe_allow_html=True)
                     assistant_response["content"] = response_content
                     st.session_state.messages.append({"role": "assistant", "content": response_content})
                 else:
@@ -871,7 +882,7 @@ else:
                 response_content += "\nFeel free to ask any of these or rephrase your question!"
                 with response_placeholder:
                     with st.chat_message("assistant"):
-                        st.markdown(response_content, unsafe_allow_html=True)
+                        st.markdown(f'<div class="assistant-response">{response_content}</div>', unsafe_allow_html=True)
                 assistant_response["content"] = response_content
                 st.session_state.messages.append({"role": "assistant", "content": response_content})
                 st.session_state.chat_history.append(assistant_response)
