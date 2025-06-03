@@ -11,13 +11,13 @@ import plotly.express as px
 import time
 
 # Snowflake/Cortex Configuration
-HOST = "HHDEKPV-ABB89903.snowflakecomputing.com"
+HOST = "itvdwya-azb15149.snowflakecomputing.com"
 DATABASE = "AI"
 SCHEMA = "DWH_MART"
 API_ENDPOINT = "/api/v2/cortex/agent:run"
 API_TIMEOUT = 50000  # in milliseconds
-CORTEX_SEARCH_SERVICES = "AI.DWH_MART.PBCS_SEARCH_SERVICE"
-SEMANTIC_MODEL = '@"AI"."DWH_MART"."PBCS"/pbcs.yaml'
+CORTEX_SEARCH_SERVICES = "AI.DWH_MART.GRANTS_SEARCH_SERVICES"
+SEMANTIC_MODEL = '@"AI"."DWH_MART"."GRANTS"/grantsyaml_27.yaml'
 
 # Model options
 MODELS = [
@@ -334,7 +334,7 @@ if not st.session_state.authenticated:
             conn = snowflake.connector.connect(
                 user=st.session_state.username,
                 password=st.session_state.password,
-                account="HHDEKPV-ABB89903",
+                account="itvdwya-azb15149",
                 host=HOST,
                 port=443,
                 warehouse="COMPUTE_WH",
