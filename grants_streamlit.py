@@ -302,25 +302,19 @@ def init_service_metadata():
     if not st.session_state.service_metadata:
         st.session_state.service_metadata = [{"name": "AI.DWH_MART.GRANTS_SEARCH_SERVICES", "search_column": ""}]
     try:
-        svc_search_col = session.sql(f"DESC CORTEX SEARCH SERVICE {st.session_state.selected_cortex_search_service};").collect()[0]["search_column"]
-        service_name = st.session_state.selected_cortex_search_service.split(".")[-1]
-        st.session_state.service_metadata = [{"name": st.session_state.selected_cortex_search_service, "service_name": service_name, "search_column": svc_search_col}]
-        if st.session_state.debug_mode:
-            st.sidebar.write(f"Debug: Initialized service metadata - Full Name: {st.session_state.selected_cortex_search_service}, Service Name: {service_name}, Search Column: {svc_search_col}")
+        svc_search_col = session.sql("DESC CORTEX SEARCH SERVICE AI.DWH_MART.GRANTS_SEARCH_SERVICES;").collect()[0]["search_column"]
+        st.session_state.service_metadata = [{"name": "AI.DWH_MART.GRANTS_SEARCH_SERVICES", "search_column": svc_search_col}]
     except Exception as e:
-        st.error(f"❌ Failed to verify {st.session_state.selected_cortex_search_service}: {str(e)}")
+        st.error(f"❌ Failed to verify AI.DWH_MART.GRANTS_SEARCH_SERVICES: {str(e)}")
 
 def query_cortex_search_service(query):
     try:
         db, schema = session.get_current_database(), session.get_current_schema()
         root = Root(session)
-        service_name = st.session_state.selected_cortex_search_service.split(".")[-1]
-        if st.session_state.debug_mode:
-            st.sidebar.write(f"Debug: Accessing Cortex Search Service - Database: {db}, Schema: {schema}, Service Name: {service_name}")
         cortex_search_service = (
             root.databases[db]
             .schemas[schema]
-            .cortex_search_services[service_name]
+            .cortex_search_services["AI.DWH_MART.GRANTS_SEARCH_SERVICES"]
         )
         context_documents = cortex_search_service.search(
             query, columns=[], limit=st.session_state.num_retrieved_chunks
@@ -331,10 +325,10 @@ def query_cortex_search_service(query):
         context_str = ""
         for i, r in enumerate(results):
             context_str += f"Context document {i+1}: {r[search_col]} \n"
-        return context_str, results
+        return context_str
     except Exception as e:
         st.error(f"❌ Error querying Cortex Search service: {str(e)}")
-        return "", []
+        return ""
 
 def get_chat_history():
     start_index = max(0, len(st.session_state.chat_history) - st.session_state.num_chat_messages)
@@ -364,27 +358,26 @@ def make_chat_history_summary(chat_history, question):
         st.sidebar.text_area("Chat History Summary", summary.replace("$", "\$"), height=150)
     return summary
 
-def create_prompt(user_question, search_context):
+def create_prompt(user_question):
     chat_history_str = ""
     if st.session_state.use_chat_history:
         chat_history = get_chat_history()
         if chat_history:
             question_summary = make_chat_history_summary(chat_history, user_question)
-            prompt_context, _ = query_cortex_search_service(question_summary)
+            prompt_context = query_cortex_search_service(question_summary)
             chat_history_str = "\n".join([f"{msg['role']}: {msg['content']}" for msg in chat_history])
         else:
-            prompt_context = search_context
+            prompt_context = query_cortex_search_service(user_question)
     else:
-        prompt_context = search_context
+        prompt_context = query_cortex_search_service(user_question)
         chat_history = []
     
     if not prompt_context.strip():
-        return "No relevant information found in the document."
+        return complete(st.session_state.model_name, user_question)
     
     prompt = f"""
         [INST]
-        You are a helpful AI chat assistant for grants management. Answer the user's question using **ONLY** the provided context from the document. Do not use any external knowledge or make assumptions beyond the context given. If the information is not available in the context, respond with "The requested information is not found in the document."
-
+        You are a helpful AI chat assistant for grants management. Use the provided context and chat history to provide a coherent, concise, and relevant answer to the user's question.
         <chat_history>
         {chat_history_str}
         </chat_history>
@@ -398,41 +391,6 @@ def create_prompt(user_question, search_context):
         Answer:
     """
     return complete(st.session_state.model_name, prompt)
-
-def extract_metrics_from_search_results(search_results, query):
-    query_lower = query.lower()
-    metrics_keywords = ["total", "amount", "number", "count", "sum", "budget", "funding"]
-    is_metrics_query = any(keyword in query_lower for keyword in metrics_keywords)
-    
-    if not is_metrics_query:
-        return None
-
-    number_patterns = [
-        r'\$\d{1,3}(,\d{3})*(\.\d+)?',
-        r'\d{1,3}(,\d{3})*(\.\d+)?\s*(million|billion|thousand)?',
-        r'\d+(\.\d+)?\s*(million|billion|thousand)?'
-    ]
-    
-    extracted_metrics = []
-    for i, result in enumerate(search_results[:5], 1):
-        result_text = result.get(st.session_state.service_metadata[0]["search_column"], "")
-        if not result_text:
-            continue
-        for pattern in number_patterns:
-            matches = re.finditer(pattern, result_text, re.IGNORECASE)
-            for match in matches:
-                value = match.group(0)
-                start_idx = max(0, match.start() - 50)
-                end_idx = min(len(result_text), match.end() + 50)
-                context_snippet = result_text[start_idx:end_idx].strip()
-                if any(keyword in context_snippet.lower() for keyword in metrics_keywords):
-                    extracted_metrics.append({
-                        "value": value,
-                        "context": context_snippet,
-                        "document": f"Document {i}"
-                    })
-    
-    return extracted_metrics
 
 def get_user_questions(limit=10):
     user_questions = [msg["content"] for msg in st.session_state.chat_history if msg["role"] == "user"]
@@ -484,45 +442,43 @@ else:
         try:
             if not query:
                 return None
-            modified_query = query
-            if st.session_state.debug_mode:
-                st.sidebar.write(f"Debug: SQL Query: {modified_query}")
-            df = session.sql(modified_query)
+            df = session.sql(query)
             data = df.collect()
             if not data:
                 return None
             columns = df.columns
             result_df = pd.DataFrame(data, columns=columns)
+            # Debug: Print column names to identify the correct award number and date columns
             if st.session_state.debug_mode:
-                st.sidebar.write("Debug - DataFrame Columns and Types:", result_df.dtypes.to_dict())
                 st.write("Debug - DataFrame Columns:", result_df.columns.tolist())
-            award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO", "award_number"]
+            # Convert award number columns to strings to prevent 'k' formatting
+            award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO"]
             for col in award_number_candidates:
                 if col in result_df.columns:
                     result_df[col] = result_df[col].astype(str)
-                    if st.session_state.debug_mode:
-                        st.sidebar.write(f"Debug: After astype(str), {col} dtype: {result_df[col].dtype}")
+            # Format date columns to YYYY-MM-DD
             date_column_candidates = ["DATE", "AWARD_DATE", "SUBMITTED_AT", "DW_DATE_ALLOCATED_KEY"]
             for col in result_df.columns:
                 if col in date_column_candidates or "DATE" in col.upper():
                     try:
                         result_df[col] = pd.to_datetime(result_df[col]).dt.strftime('%Y-%m-%d')
                     except (ValueError, TypeError):
-                        continue
+                        continue  # Skip if the column can't be converted to datetime
             return result_df
         except Exception as e:
-            st.error(f"Error executing SQL query: {str(e)}            return None
+            st.error(f"Error executing SQL query: {str(e)}")
+            return None
 
     def is_structured_query(query: str):
         structured_patterns = [
-            r'\b(count|number|amount|where|group by|order by|sum|avg|type|type|max|min|total|how many|which|show|list)\b',
-            r'\b(grant|award|funding|recipient|application|status|budget|cost|encumbrance|posted|approved|task|actual)\b'
+            r'\b(count|number|amount|where|group by|order by|sum|avg|max|min|total|how many|which|show|list)\b',
+            r'\b(grant|award|funding|recipient|application|status|budget|encumbrance|posted|approved|task|actual)\b'
         ]
         return any(re.search(pattern, query.lower()) for pattern in structured_patterns)
 
     def is_complete_query(query: str):
-        complete_patterns = [r'\b(generate|write|type|describe|explain)\b']
-        return any(re.search(pattern, query.lower()) for pattern in complete_patterns
+        complete_patterns = [r'\b(generate|write|create|describe|explain)\b']
+        return any(re.search(pattern, query.lower()) for pattern in complete_patterns)
 
     def is_summarize_query(query: str):
         summarize_patterns = [r'\b(summarize|summary|condense)\b']
@@ -530,41 +486,42 @@ else:
 
     def is_question_suggestion_query(query: str):
         suggestion_patterns = [
-            r'\b(what|which|how)\b.*\b\s+\b(questions|queries)\b.*\s+\b(ask|can i ask)\b',
+            r'\b(what|which|how)\b.*\b(questions|queries)\b.*\s+\b(ask|can i ask)\b',
             r'\b(give me|show me|list)\b.*\s+\b(questions|examples)\b'
         ]
-        return any(re.search(pattern creativo query.lower()) for pattern in suggestion_patterns)
+        return any(re.search(pattern, query.lower()) for pattern in suggestion_patterns)
 
-    def is_greeting(query: str):
+    def is_greeting_query(query: str):
         greeting_patterns = [r'^\s*(hello|hi|hey|greet)\s*$']
         return any(re.search(pattern, query.lower()) for pattern in greeting_patterns)
 
     def complete(model, prompt):
         try:
             prompt = prompt.replace("'", "\\'")
-            query = f"SELECT SNOWFLAKE.CORTEX.COMPLETE('{model}', '{prompt}') AS response")
+            query = f"SELECT SNOWFLAKE.CORTEX.COMPLETE('{model}', '{prompt}') AS response"
             result = session.sql(query).collect()
             return result[0]["RESPONSE"]
         except Exception as e:
             st.error(f"Error in COMPLETE function: {str(e)}")
-            return "The requested information is not found in the document."
+            return None
 
     def summarize(text):
         try:
             text = text.replace("'", "\\'")
-            query = f"SELECT SNOWFLAKE.CORTEX.SUMMARIZE('{text}') AS summary")
+            query = f"SELECT SNOWFLAKE.CORTEX.SUMMARIZE('{text}') AS summary"
             result = session.sql(query).collect()
             return result[0]["SUMMARY"]
         except Exception as e:
             st.error(f"Error in SUMMARIZE function: {str(e)}")
             return None
 
-    def parse_sse_response(response_text: str) -> List[Dict[str, int]]:
+    def parse_sse_response(response_text: str) -> List[Dict]:
         events = []
-        lines = response_text.strip().split("\n\n")
+        lines = response_text.strip().split("\n")
+        current_event = {}
         for line in lines:
             if line.startswith("event:"):
-                current_event = {"event": line.split(":", 1)[1].strip()}
+                current_event["event"] = line.split(":", 1)[1].strip()
             elif line.startswith("data:"):
                 data_str = line.split(":", 1)[1].strip()
                 if data_str != "[DONE]":
@@ -581,12 +538,11 @@ else:
         sql = ""
         search_results = []
         if not response:
-            return None
-        sql, search_results
+            return sql, search_results
         for event in response:
             if event.get("event") == "message.delta" and "data" in event:
                 delta = event["data"].get("delta", {})
-                content = delta.get("content", []])
+                content = delta.get("content", [])
                 for item in content:
                     if item.get("type") == "tool_results":
                         tool_results = item.get("tool_results", {})
@@ -597,21 +553,21 @@ else:
                                     if is_structured and "sql" in result_data:
                                         sql = result_data.get("sql", "")
                                     elif not is_structured and "searchResults" in result_data:
-                                        search_results = result_data["searchResults"]
+                                        search_results = [sr["text"] for sr in result_data["searchResults"]]
         return sql.strip(), search_results
 
     def snowflake_api_call(query: str, is_structured: bool = False):
         payload = {
             "model": st.session_state.model_name,
             "messages": [{"role": "user", "content": [{"type": "text", "text": query}]}],
-            "tools": []}
+            "tools": []
         }
         if is_structured:
             payload["tools"].append({"tool_spec": {"type": "cortex_analyst_text_to_sql", "name": "analyst1"}})
             payload["tool_resources"] = {"analyst1": {"semantic_model_file": SEMANTIC_MODEL}}
         else:
             payload["tools"].append({"tool_spec": {"type": "cortex_search", "name": "search1"}})
-            payload["tool_resources"] = {"search1": {"name": st.session_state.selected_cortex_search_service, "max_results": st.session_state.num_retrieved_chunks}}}}
+            payload["tool_resources"] = {"search1": {"name": st.session_state.selected_cortex_search_service, "max_results": st.session_state.num_retrieved_chunks}}
         try:
             resp = requests.post(
                 url=f"https://{HOST}{API_ENDPOINT}",
@@ -677,40 +633,56 @@ else:
             query_lower = query.lower()
             if re.search(r'\b(category|type)\b', query_lower):
                 default_data = "Pie Chart"
-            elif re.search(r'\b(year|type)d in\b', query_lower):
+            elif re.search(r'\b(year|date)\b', query_lower):
                 default_data = "Line Chart"
             else:
                 default_data = "Bar Chart"
             all_cols = list(df.columns)
-            numeric_cols = [col for col in df.columns if pd.api.types.is_numeric_dtype(df[col])]
+            numeric_cols = [col for col in all_cols if pd.api.types.is_numeric_dtype(df[col])]
             y_options = numeric_cols + ["All Columns"]
             col1, col2, col3 = st.columns(3)
-            x_col = col1.selectbox("X axis", all_cols, index=0, key=f"{prefix}_colum1")
+            x_col = col1.selectbox("X axis", all_cols, index=0, key=f"{prefix}_x")
             remaining_cols = [c for c in y_options if c != x_col]
-            y_col = col2.selectbox("Y axis", remaining_cols, index=0, key=f"{prefix}_colum2")
-            chart_options = ["Line Chart", "Bar Chart", "Pie Chart", "Scatter Chart"]
-            chart_type = col3.selectbox("Chart Type", chart_options, index=chart_options.index(default_data), key=f"{prefix}_data")
+            y_col = col2.selectbox("Y axis", remaining_cols, index=0, key=f"{prefix}_y")
+            chart_options = ["Line Chart", "Bar Chart", "Pie Chart", "Scatter Chart", "Histogram Chart"]
+            chart_type = col3.selectbox("Chart Type", chart_options, index=chart_options.index(default_data), key=f"{prefix}_type")
             if y_col == "All Columns":
-                return
-            df_melted = pd.melt(df, id_vars=[x_col], value_vars=numeric_cols, var_name="columns", value_name="values")
-            if chart_type == "Line Chart":
-                fig = px.line(df_melted, x=x_col, y="values", color="columns", title=f"Line Chart: {x_col} vs {y_col}")
-                st.plotly_chart(fig, key=f"{prefix}_line")
-            elif chart_type == "Bar Chart":
-                fig = px.bar(df_melted, x=x_col, y="values", color="columns", title=f"Bar Chart: {x_col} vs {y_col}")
-                st.plotly_chart(fig, key=f"{prefix}_bar")
-            elif chart_type == "Pie Chart":
-                fig = px.pie(df, names=x_col, values=y_col, title=f"Pie Chart: Distribution of {y_col} by {x_col}")
-                st.plotly_chart(fig, key=f"{prefix}_pie")
-            elif chart_type == "Scatter Chart":
-                fig = px.scatter(df_melted, x=x_col, y="values", color="columns", title=f"Scatter Chart: {x_col} vs {y_col}")
-                st.plotly_chart(fig, key=f"{prefix}_scatter")
+                df_melted = pd.melt(df, id_vars=[x_col], value_vars=numeric_cols, var_name="Variable", value_name="Value")
+                if chart_type == "Line Chart":
+                    fig = px.line(df_melted, x=x_col, y="Value", color="Variable", title=chart_type)
+                    st.plotly_chart(fig, key=f"{prefix}_line")
+                elif chart_type == "Bar Chart":
+                    fig = px.bar(df_melted, x=x_col, y="Value", color="Variable", title=chart_type)
+                    st.plotly_chart(fig, key=f"{prefix}_bar")
+                elif chart_type == "Pie Chart":
+                    fig = px.pie(df_melted, names=x_col, values="Value", title=chart_type)
+                    st.plotly_chart(fig, key=f"{prefix}_pie")
+                elif chart_type == "Scatter Chart":
+                    fig = px.scatter(df_melted, x=x_col, y="Value", color="Variable", title=chart_type)
+                    st.plotly_chart(fig, key=f"{prefix}_scatter")
+                elif chart_type == "Histogram Chart":
+                    fig = px.histogram(df_melted, x=x_col, y="Value", color="Variable", title=chart_type)
+                    st.plotly_chart(fig, key=f"{prefix}_hist")
             else:
-                st.warning(f"Chart type '{chart_type}' not supported.")
+                if chart_type == "Line Chart":
+                    fig = px.line(df, x=x_col, y=y_col, title=chart_type)
+                    st.plotly_chart(fig, key=f"{prefix}_line")
+                elif chart_type == "Bar Chart":
+                    fig = px.bar(df, x=x_col, y=y_col, title=chart_type)
+                    st.plotly_chart(fig, key=f"{prefix}_bar")
+                elif chart_type == "Pie Chart":
+                    fig = px.pie(df, names=x_col, values=y_col, title=chart_type)
+                    st.plotly_chart(fig, key=f"{prefix}_pie")
+                elif chart_type == "Scatter Chart":
+                    fig = px.scatter(df, x=x_col, y=y_col, title=chart_type)
+                    st.plotly_chart(fig, key=f"{prefix}_scatter")
+                elif chart_type == "Histogram Chart":
+                    fig = px.histogram(df, x=x_col, y=y_col, title=chart_type)
+                    st.plotly_chart(fig, key=f"{prefix}_hist")
         except Exception as e:
             st.error(f"Error generating chart: {str(e)}")
 
-    def toggle_tab():
+    def toggle_about():
         st.session_state.show_about = not st.session_state.show_about
         st.session_state.show_help = False
         st.session_state.show_history = False
@@ -738,7 +710,7 @@ else:
             index=0,
             key="selected_cortex_search_service"
         )
-        st.toggle("Debug Mode", key="debug_mode")
+        st.toggle("Debug", key="debug_mode")
         st.toggle("Use chat history", key="use_chat_history")
         with st.expander("Advanced options"):
             st.selectbox("Select model:", MODELS, key="model_name")
@@ -759,22 +731,21 @@ else:
         if st.button("Sample Questions"):
             st.session_state.show_sample_questions = not st.session_state.get("show_sample_questions", False)
         if st.session_state.get("show_sample_questions", False):
-            st.sidebar.markdown("### Sample Questions")
+            st.markdown("### Sample Questions")
             sample_questions = [
-                "What is the total fund amount in the document?",
                 "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
                 "Give me date wise award breakdowns",
                 "Give me award breakdowns",
-                "Give me date wise award budget, actual award posted, award budget posted, award budget approved",
+                "Give me date wise award budget, actual award posted, award encumbrance posted, award encumbrance approved",
                 "What is the task actual posted by award name?",
                 "What is the award budget posted by date for these awards?",
-                "What is the total award budget posted by date?",
+                "What is the total award encumbrance posted for these awards?",
                 "What is the total amount of award encumbrances approved?",
-                "What is the total amount of award posted for these awards?",
+                "What is the total actual award posted for these awards?",
                 "What is the award budget posted?",
                 "What is this document about?",
-                "Subject areas areas subject",
-                "What are the five layers in High level Architecture"
+                "Subject areas",
+                "Explain five layers in High level Architecture"
             ]
             for sample in sample_questions:
                 if st.button(sample, key=f"sidebar_{sample}"):
@@ -783,65 +754,65 @@ else:
         with st.expander("Submit Grant Application"):
             st.markdown("### Submit a Grant Application")
             grant_id = st.text_input("Grant ID", key="grant_id")
-            applicant_name = st.text_input("Applicant Name", key="name_applicant_name")
-            application_details = st.text_area("Application Details", key="details_application")
+            applicant_name = st.text_input("Applicant Name", key="applicant_name")
+            application_details = st.text_area("Application Details", key="application_details")
             if st.button("Submit Application", key="submit_grant_application"):
                 if not grant_id or not applicant_name or not application_details:
                     st.error("Please fill in all fields to submit a grant application.")
                 else:
-                    success, response = submit_grant_application(grant_id, applicant_name, application_details)
+                    success, message = submit_grant_application(grant_id, applicant_name, application_details)
                     if success:
-                        st.success(response)
+                        st.success(message)
                     else:
-                        st.error(response)
+                        st.error(message)
         st.markdown("---")
         if st.button("History"):
             toggle_history()
         if st.session_state.show_history:
             st.markdown("### Recent Questions")
-            st.session_state.user_questions = get_user_questions(limit=10)
-            if not st.session_state.user_questions:
+            user_questions = get_user_questions(limit=10)
+            if not user_questions:
                 st.write("No questions in history yet.")
             else:
-                for idx, question in enumerate(st.session_state.user_questions):
+                for idx, question in enumerate(user_questions):
                     if st.button(question, key=f"history_{idx}"):
                         st.session_state.query = question
-                        st.session_state.show_history = False
+                        st.session_state.show_greeting = False
         if st.button("About"):
-            toggle_tab()
+            toggle_about()
         if st.session_state.show_about:
             st.markdown("### About")
             st.write(
-                "This application uses **Snowflake Cortex AI** to interpret "
-                "your natural language data and queries to generate insightful data insights for grant management."
+                "This application uses **Snowflake Cortex Analyst** to interpret "
+                "your natural language questions and generate data insights for grants management."
             )
         if st.button("Help & Documentation"):
             toggle_help()
         if st.session_state.show_help:
             st.markdown("### Help & Documentation")
             st.write(
-                "- [User Guide](https://docs.snowflake.com/en-US/docs-overview-ai-features)\n"
-                "- [Snowflake Cortex Analyst Docs](https://docs.snowflake.com/en-US)\n"
-                "- [Contact Support](https://support.snowflake.com/en/support/contact-us)\n"
+                "- [User Guide](https://docs.snowflake.com/en/guides-overview-ai-features)\n"
+                "- [Snowflake Cortex Analyst Docs](https://docs.snowflake.com/)\n"
+                "- [Contact Support](https://www.snowflake.com/en/support/)"
             )
 
     # --- Main UI ---
     st.markdown(
-        """
-        <div class="fixed-header">
-            <h1>Cortex AI – Grants Management Assistant by DiLytics</h1>
-            <p><strong>Welcome to Cortex AI. I am here to help with DiLytics Grants Management Insights.</strong></p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    """
+    <div class="fixed-header">
+        <h1>Cortex AI – Grants Management Assistant by DiLytics</h1>
+        <p><strong>Welcome to Cortex AI. I am here to help with DiLytics Grants Management Insights Solutions.</strong></p>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
     semantic_model_filename = SEMANTIC_MODEL.split("/")[-1]
     st.markdown(f"Semantic Model: `{semantic_model_filename}`")
     init_service_metadata()
 
     if st.session_state.show_greeting and not st.session_state.chat_history:
-        st.markdown("Welcome! I’m here to assist you with Grants Management. Ask about your grants, awards, funding, recipients, or submit a grant application to get started!")
+        st.markdown("Welcome! I’m the Snowflake AI Assistant, ready to assist you with Grants Management. Ask about your grants, funding, recipients, or submit a grant application to get started!")
     else:
         st.session_state.show_greeting = False
 
@@ -853,12 +824,11 @@ else:
                     st.code(message["sql"], language="sql")
                 st.markdown(f"**Query Results ({len(message['results'])} rows):**")
                 df_to_display = message["results"].copy()
-                award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO", "award_number"]
+                # Ensure award numbers are strings and dates are in YYYY-MM-DD format
+                award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO"]
                 for col in award_number_candidates:
                     if col in df_to_display.columns:
                         df_to_display[col] = df_to_display[col].astype(str)
-                        if st.session_state.debug_mode:
-                            st.sidebar.write(f"Debug: In chat history, {col} dtype: {df_to_display[col].dtype}")
                 date_column_candidates = ["DATE", "AWARD_DATE", "SUBMITTED_AT", "DW_DATE_ALLOCATED_KEY"]
                 for col in df_to_display.columns:
                     if col in date_column_candidates or "DATE" in col.upper():
@@ -866,9 +836,10 @@ else:
                             df_to_display[col] = pd.to_datetime(df_to_display[col]).dt.strftime('%Y-%m-%d')
                         except (ValueError, TypeError):
                             continue
-                st.table(df_to_display)
+                st.dataframe(df_to_display)
                 if not df_to_display.empty and len(df_to_display.columns) >= 2:
                     st.markdown("**📈 Visualization:**")
+                    # Use message_id to ensure unique keys
                     message_id = message.get("message_id", 0)
                     chart_prefix = f"chart_{message_id}"
                     display_chart_tab(df_to_display, prefix=chart_prefix, query=message.get("query", ""))
@@ -907,10 +878,12 @@ else:
             chat_history = get_chat_history()
             if chat_history:
                 combined_query = make_chat_history_summary(chat_history, query)
+        # Safeguard: Ensure message_counter is initialized
         if "message_counter" not in st.session_state:
             st.session_state.message_counter = 0
             if st.session_state.debug_mode:
                 st.sidebar.write("Debug: Re-initialized message_counter to 0 before incrementing")
+        # Increment message counter and assign unique message_id
         st.session_state.message_counter += 1
         if st.session_state.debug_mode:
             st.sidebar.write(f"Debug: Incremented message_counter to {st.session_state.message_counter}")
@@ -933,6 +906,7 @@ else:
                 is_summarize = is_summarize_query(combined_query)
                 is_suggestion = is_question_suggestion_query(combined_query)
                 is_greeting = is_greeting_query(combined_query)
+                # Increment message counter for assistant response
                 if "message_counter" not in st.session_state:
                     st.session_state.message_counter = 0
                     if st.session_state.debug_mode:
@@ -988,8 +962,7 @@ else:
                     st.session_state.messages.append({"role": "assistant", "content": response_content})
 
                 elif is_complete:
-                    search_context, _ = query_cortex_search_service(combined_query)
-                    response = create_prompt(combined_query, search_context)
+                    response = create_prompt(combined_query)
                     if response:
                         response_content = f"**Generated Response:**\n{response}"
                         response_placeholder.markdown(response_content, unsafe_allow_html=True)
@@ -1025,12 +998,11 @@ else:
                                 st.code(sql, language="sql")
                             st.markdown(f"**Query Results ({len(results)} rows):**")
                             df_to_display = results.copy()
-                            award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO", "award_number"]
+                            # Ensure award numbers are strings and dates are in YYYY-MM-DD format
+                            award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO"]
                             for col in award_number_candidates:
                                 if col in df_to_display.columns:
                                     df_to_display[col] = df_to_display[col].astype(str)
-                                    if st.session_state.debug_mode:
-                                        st.sidebar.write(f"Debug: In query response, {col} dtype: {df_to_display[col].dtype}")
                             date_column_candidates = ["DATE", "AWARD_DATE", "SUBMITTED_AT", "DW_DATE_ALLOCATED_KEY"]
                             for col in df_to_display.columns:
                                 if col in date_column_candidates or "DATE" in col.upper():
@@ -1038,9 +1010,10 @@ else:
                                         df_to_display[col] = pd.to_datetime(df_to_display[col]).dt.strftime('%Y-%m-%d')
                                     except (ValueError, TypeError):
                                         continue
-                            st.table(df_to_display)
+                            st.dataframe(df_to_display)
                             if len(df_to_display.columns) >= 2:
                                 st.markdown("**📈 Visualization:**")
+                                # Use assistant's message_id for chart prefix
                                 chart_prefix = f"chart_{assistant_response['message_id']}"
                                 display_chart_tab(df_to_display, prefix=chart_prefix, query=combined_query)
                             assistant_response.update({
@@ -1069,41 +1042,16 @@ else:
                     response = snowflake_api_call(combined_query, is_structured=False)
                     _, search_results = process_sse_response(response, is_structured=False)
                     if search_results:
-                        search_context, raw_results = query_cortex_search_service(combined_query)
-                        if st.session_state.debug_mode:
-                            st.sidebar.write("Debug: Search Context from Cortex Search Service:", search_context)
-                            st.sidebar.write("Debug: Raw Search Results (Top 5):", [
-                                result[st.session_state.service_metadata[0]["search_column"]][:200] + "..." 
-                                if len(result[st.session_state.service_metadata[0]["search_column"]]) > 200 
-                                else result[st.session_state.service_metadata[0]["search_column"]] 
-                                for result in raw_results[:5]
-                            ])
-                        
-                        metrics = extract_metrics_from_search_results(raw_results, combined_query)
-                        if metrics:
-                            response_content = "**Extracted Metrics:**\n"
-                            for metric in metrics:
-                                response_content += f"- {metric['value']} (from {metric['document']})\n"
-                                response_content += f"  Context: {metric['context']}\n\n"
+                        raw_result = search_results[0]
+                        summary = create_prompt(combined_query)
+                        if summary:
+                            response_content = f"**Answer:**\n{summary}"
                         else:
-                            summary = create_prompt(combined_query, search_context)
-                            response_content = f"**Answer:**\n{summary}\n\n"
-                        
-                        response_content += "**Relevant Excerpts:**\n"
-                        for i, result in enumerate(raw_results[:3], 1):
-                            result_text = result.get(st.session_state.service_metadata[0]["search_column"], "")
-                            sentences = re.split(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|")\s', result_text.strip())
-                            excerpt = "\n".join(f"  • {sent.strip()}" for sent in sentences[:3] if sent.strip())
-                            response_content += f"**Document {i}:**\n{excerpt}\n\n"
-                        
+                            response_content = f"**Key Information:**\n{summarize_unstructured_answer(raw_result)}"
                         response_placeholder.markdown(response_content, unsafe_allow_html=True)
                         assistant_response["content"] = response_content
                         st.session_state.messages.append({"role": "assistant", "content": response_content})
                     else:
-                        response_content = "No relevant information found in the document."
-                        response_placeholder.markdown(response_content, unsafe_allow_html=True)
-                        assistant_response["content"] = response_content
-                        st.session_state.messages.append({"role": "assistant", "content": response_content})
                         failed_response = True
 
                 if failed_response:
