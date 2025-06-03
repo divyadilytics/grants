@@ -44,6 +44,7 @@ if "authenticated" not in st.session_state:
     st.session_state.snowpark_session = None
     st.session_state.chat_history = []
     st.session_state.messages = []
+    st.session_state.message_counter = 0  # Add counter for unique message IDs
 if "debug_mode" not in st.session_state:
     st.session_state.debug_mode = False
 if "last_suggestions" not in st.session_state:
@@ -295,6 +296,7 @@ def start_new_conversation():
     st.session_state.previous_query = None
     st.session_state.previous_sql = None
     st.session_state.previous_results = None
+    st.session_state.message_counter = 0  # Reset counter
     st.rerun()
 
 def init_service_metadata():
@@ -832,7 +834,10 @@ else:
                 st.dataframe(df_to_display)
                 if not df_to_display.empty and len(df_to_display.columns) >= 2:
                     st.markdown("**📈 Visualization:**")
-                    display_chart_tab(df_to_display, prefix=f"chart_{hash(message['content'])}", query=message.get("query", ""))
+                    # Use message_id to ensure unique keys
+                    message_id = message.get("message_id", 0)
+                    chart_prefix = f"chart_{message_id}"
+                    display_chart_tab(df_to_display, prefix=chart_prefix, query=message.get("query", ""))
 
     chat_input_query = st.chat_input("Ask your question about grants...")
     if chat_input_query:
@@ -862,7 +867,14 @@ else:
             chat_history = get_chat_history()
             if chat_history:
                 combined_query = make_chat_history_summary(chat_history, query)
-        st.session_state.chat_history.append({"role": "user", "content": original_query})
+        # Increment message counter and assign unique message_id
+        st.session_state.message_counter += 1
+        user_message = {
+            "role": "user",
+            "content": original_query,
+            "message_id": st.session_state.message_counter
+        }
+        st.session_state.chat_history.append(user_message)
         st.session_state.messages.append({"role": "user", "content": original_query})
         with st.chat_message("user"):
             st.markdown(original_query)
@@ -876,7 +888,14 @@ else:
                 is_summarize = is_summarize_query(combined_query)
                 is_suggestion = is_question_suggestion_query(combined_query)
                 is_greeting = is_greeting_query(combined_query)
-                assistant_response = {"role": "assistant", "content": "", "query": combined_query}
+                # Increment message counter for assistant response
+                st.session_state.message_counter += 1
+                assistant_response = {
+                    "role": "assistant",
+                    "content": "",
+                    "query": combined_query,
+                    "message_id": st.session_state.message_counter
+                }
                 response_content = ""
                 failed_response = False
 
@@ -970,7 +989,9 @@ else:
                             st.dataframe(df_to_display)
                             if len(df_to_display.columns) >= 2:
                                 st.markdown("**📈 Visualization:**")
-                                display_chart_tab(df_to_display, prefix=f"chart_{hash(combined_query)}", query=combined_query)
+                                # Use assistant's message_id for chart prefix
+                                chart_prefix = f"chart_{assistant_response['message_id']}"
+                                display_chart_tab(df_to_display, prefix=chart_prefix, query=combined_query)
                             assistant_response.update({
                                 "content": response_content,
                                 "sql": sql,
