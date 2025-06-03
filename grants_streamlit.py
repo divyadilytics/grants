@@ -94,6 +94,8 @@ st.markdown("""
     font-family: Arial, sans-serif !important;
     font-size: 16px !important;
     line-height: 1.5 !important;
+    text-align: left !important;
+    font-style: normal !important;
 }
 [data-testid="stChatMessageContent"] {
     white-space: normal !important; /* Ensure text wraps */
@@ -103,12 +105,16 @@ st.markdown("""
     font-family: Arial, sans-serif !important;
     font-size: 16px !important;
     line-height: 1.5 !important;
+    text-align: left !important;
+    font-style: normal !important;
 }
 /* Apply Arial to all text elements for consistency */
 body, p, div, span, h1, h2, h3, h4, h5, h6, li, a, input, button, select, option, textarea {
     font-family: Arial, sans-serif !important;
     font-size: 16px !important;
     line-height: 1.5 !important;
+    text-align: left !important;
+    font-style: normal !important;
 }
 /* Style for the logo container */
 .logo-container {
@@ -828,7 +834,12 @@ else:
                     results = run_snowflake_query(sql)
                     if results is not None and not results.empty:
                         results_text = results.to_string(index=False)
-                        prompt = f"Provide a concise natural language answer to the query '{query}' using the following data, avoiding phrases like 'Based on the query results':\n\n{results_text}"
+                        prompt = f"""
+                        Provide a concise natural language answer to the query '{query}' using the following data. Format the response as a series of sentences, one for each award number, in the format: "The budget posted for award number [award_number] is [amount]." For the last award number, use: "Lastly, the posted budget for award number [award_number] is [amount]." Make the award numbers bold using Markdown syntax (e.g., **41001**). Avoid phrases like 'Based on the query results'. Ensure proper spacing and punctuation between sentences.
+
+                        Data:
+                        {results_text}
+                        """
                         summary = complete(st.session_state.model_name, prompt)
                         if not summary:
                             summary = "⚠️ Unable to generate a natural language summary."
