@@ -91,12 +91,18 @@ st.markdown("""
 [data-testid="stChatMessage"] {
     opacity: 1 !important;
     background-color: transparent !important;
+    font-family: 'Times New Roman', Times, serif !important;
 }
 [data-testid="stChatMessageContent"] {
     white-space: normal !important; /* Ensure text wraps */
     overflow-wrap: break-word !important; /* Wrap long words */
     word-break: break-word !important; /* Break words if necessary */
     max-width: 100% !important; /* Ensure content doesn't overflow */
+    font-family: 'Times New Roman', Times, serif !important;
+}
+/* Apply Times New Roman to all text elements */
+body, p, div, span, h1, h2, h3, h4, h5, h6, li, a, input, button, select, option, textarea {
+    font-family: 'Times New Roman', Times, serif !important;
 }
 /* Style for the logo container */
 .logo-container {
@@ -520,32 +526,6 @@ else:
         # Return the first 5 questions from the predefined sample_questions list
         return sample_questions[:5]
 
-    def process_sse_response(response, is_structured):
-        sql = ""
-        search_results = []
-        if not response:
-            return sql, search_results
-        try:
-            for event in response:
-                if event.get("event") == "message.delta" and "data" in event:
-                    delta = event["data"].get("delta", {})
-                    content = delta.get("content", [])
-                    for item in content:
-                        if item.get("type") == "tool_results":
-                            tool_results = item.get("tool_results", {})
-                            if "content" in tool_results:
-                                for result in tool_results["content"]:
-                                    if result.get("type") == "json":
-                                        result_data = result.get("json", {})
-                                        if is_structured and "sql" in result_data:
-                                            sql = result_data.get("sql", "")
-                                        elif not is_structured and "searchResults" in result_data:
-                                            search_results = [sr["text"] for sr in result_data["searchResults"]]
-        except Exception as e:
-            st.error(f"❌ Error Processing Response: {str(e)}")
-            return sql, search_results
-        return sql.strip(), search_results
-
     def display_chart_tab(df: pd.DataFrame, prefix: str = "chart", query: str = ""):
         if df.empty or len(df.columns) < 2:
             return
@@ -557,6 +537,7 @@ else:
         else:
             default_chart = "Bar Chart"
         all_cols = list(df.columns)
+        numeric_cols = [col for col in all_cols if pd.api.types.is_numeric_dtype(df[col])]
         col1, col2, col3 = st.columns(3)
         default_x = st.session_state.get(f"{prefix}_x", all_cols[0])
         try:
@@ -565,12 +546,13 @@ else:
             x_index = 0
         x_col = col1.selectbox("X axis", all_cols, index=x_index, key=f"{prefix}_x")
         remaining_cols = [c for c in all_cols if c != x_col]
+        y_options = remaining_cols + ["All Columns"] if numeric_cols else remaining_cols
         default_y = st.session_state.get(f"{prefix}_y", remaining_cols[0] if remaining_cols else all_cols[0])
         try:
-            y_index = remaining_cols.index(default_y)
+            y_index = y_options.index(default_y)
         except ValueError:
             y_index = 0
-        y_col = col2.selectbox("Y axis", remaining_cols, index=y_index, key=f"{prefix}_y")
+        y_col = col2.selectbox("Y axis", y_options, index=y_index, key=f"{prefix}_y")
         chart_options = ["Line Chart", "Bar Chart", "Pie Chart", "Scatter Chart", "Histogram Chart"]
         default_type = st.session_state.get(f"{prefix}_type", default_chart)
         try:
@@ -578,20 +560,36 @@ else:
         except ValueError:
             type_index = chart_options.index(default_chart)
         chart_type = col3.selectbox("Chart Type", chart_options, index=type_index, key=f"{prefix}_type")
+        
+        # Handle "All Columns" for Y-axis
+        if y_col == "All Columns" and numeric_cols:
+            # Aggregate numeric columns (excluding x_col) by summing
+            agg_cols = [col for col in numeric_cols if col != x_col]
+            if agg_cols:
+                df_agg = df.groupby(x_col)[agg_cols].sum().reset_index()
+                df_agg['Total'] = df_agg[agg_cols].sum(axis=1)
+                y_col_agg = 'Total'
+            else:
+                st.warning("No numeric columns available for aggregation.")
+                return
+        else:
+            df_agg = df
+            y_col_agg = y_col
+
         if chart_type == "Line Chart":
-            fig = px.line(df, x=x_col, y=y_col, title=chart_type)
+            fig = px.line(df_agg, x=x_col, y=y_col_agg, title=chart_type)
             st.plotly_chart(fig, key=f"{prefix}_line")
         elif chart_type == "Bar Chart":
-            fig = px.bar(df, x=x_col, y=y_col, title=chart_type)
+            fig = px.bar(df_agg, x=x_col, y=y_col_agg, title=chart_type)
             st.plotly_chart(fig, key=f"{prefix}_bar")
         elif chart_type == "Pie Chart":
-            fig = px.pie(df, names=x_col, values=y_col, title=chart_type)
+            fig = px.pie(df_agg, names=x_col, values=y_col_agg, title=chart_type)
             st.plotly_chart(fig, key=f"{prefix}_pie")
         elif chart_type == "Scatter Chart":
-            fig = px.scatter(df, x=x_col, y=y_col, title=chart_type)
+            fig = px.scatter(df_agg, x=x_col, y=y_col_agg, title=chart_type)
             st.plotly_chart(fig, key=f"{prefix}_scatter")
         elif chart_type == "Histogram Chart":
-            fig = px.histogram(df, x=x_col, title=chart_type)
+            fig = px.histogram(df_agg, x=x_col, title=chart_type)
             st.plotly_chart(fig, key=f"{prefix}_hist")
 
     # UI Logic
@@ -894,4 +892,3 @@ else:
             st.session_state.current_results = assistant_response.get("results")
             st.session_state.current_sql = assistant_response.get("sql")
             st.session_state.current_summary = assistant_response.get("summary")
-
