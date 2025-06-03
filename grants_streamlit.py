@@ -656,11 +656,19 @@ else:
         if st.session_state.get("show_sample_questions", False):
             st.markdown("### Sample Questions")
             sample_questions = [
-                "What is the total award budget posted by date?",
-                "Which awards have the highest encumbrances in the current quarter?",
-                "What is the total amount of award encumbrances approved this month?",
-                "What is the date-wise breakdown of award budgets?",
-                "Which awards have pending encumbrances for more than two weeks?"
+                "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
+                "Give me date wise award breakdowns",
+                "Give me award breakdowns",
+                "Give me date wise award budget, actual award posted, award encumbrance posted, award encumbrance approved",
+                "What is the task actual posted by award name?",
+                "What is the award budget posted by date for these awards?",
+                "What is the total award encumbrance posted for these awards?",
+                "What is the total amount of award encumbrances approved?",
+                "What is the total actual award posted for these awards?",
+                "what is the award budget posted?",
+                "what is this document about",
+                "Subject areas",
+                "explain five layers in High level Architecture"
             ]
             for sample in sample_questions:
                 if st.button(sample, key=f"sidebar_{sample}"):
