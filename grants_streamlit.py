@@ -130,13 +130,13 @@ def start_new_conversation():
 
 # Initialize service metadata
 def init_service_metadata():
-    st.session_state.service_metadata = [{"name": "PBCS_SEARCH_SERVICE", "search_column": ""}]
-    st.session_state.selected_cortex_search_service = "PBCS_SEARCH_SERVICE"
+    st.session_state.service_metadata = [{"name": "GRANTS_SEARCH_SERVICE", "search_column": ""}]
+    st.session_state.selected_cortex_search_service = "GRANTS_SEARCH_SERVICE"
     try:
-        svc_search_col = session.sql("DESC CORTEX SEARCH SERVICE PBCS_SEARCH_SERVICE;").collect()[0]["search_column"]
-        st.session_state.service_metadata = [{"name": "PBCS_SEARCH_SERVICE", "search_column": svc_search_col}]
+        svc_search_col = session.sql("DESC CORTEX SEARCH SERVICE GRANTS_SEARCH_SERVICE;").collect()[0]["search_column"]
+        st.session_state.service_metadata = [{"name": "GRANTS_SEARCH_SERVICE", "search_column": svc_search_col}]
     except Exception as e:
-        st.error(f"❌ Failed to verify PBCS_SEARCH_SERVICE: {str(e)}. Using default configuration.")
+        st.error(f"❌ Failed to verify GRANTS_SEARCH_SERVICE: {str(e)}. Using default configuration.")
 
 # Initialize config options
 def init_config_options():
@@ -247,37 +247,40 @@ def create_prompt(user_question):
             if re.search(r'fy\s?\d{2}-\d{2}', query_lower):
                 fiscal_year = re.search(r'fy\s?(\d{2}-\d{2})', query_lower).group(1)
                 prompt_instruction = (
-                    f"Provide a detailed and concise explanation for the query '{user_question}' in the context of the Planning and Budgeting system for FY {fiscal_year}. "
-                    f"Describe the metric’s definition (e.g., Allocated FTE, Total Amount), calculation logic (e.g., aggregation of position or financial data), "
-                    f"join conditions (e.g., tables like POSITION_FACT or LINE_ITEM joined with dimensions like ORGANIZATION or FUND), "
-                    f"filter conditions (e.g., specific versions like COUNCIL1 or scenarios like FORECASTING), "
-                    f"and its business significance in budgeting or planning. Include relevant dimensions (e.g., Organization, Fund, Version). "
+                    f"Provide a detailed and concise explanation for the query '{user_question}' in the context of the Grants Management system for FY {fiscal_year}. "
+                    f"Describe the metric’s definition (e.g., Total Award Amount, Active Grants Count), calculation logic (e.g., aggregation of award or grant activity data), "
+                    f"join conditions (e.g., tables like GRANT_AWARD or GRANT_ACTIVITY joined with dimensions like GRANTEE or FUNDING_SOURCE), "
+                    f"filter conditions (e.g., specific grant types like FEDERAL or FOUNDATION, or project status like ACTIVE or CLOSED), "
+                    f"and its business significance in grant management, reporting, or compliance. Include relevant dimensions (e.g., Grantee, Funding Source, Grant Type). "
                     f"Ensure the response is clear, concise, avoids document references, and directly addresses the metric."
+
                 )
             else:
                 prompt_instruction = (
-                    f"Provide a detailed and concise explanation for the query '{user_question}' in the context of the Planning and Budgeting system. "
-                    f"Describe the metric’s definition (e.g., Allocated FTE, Total Amount), calculation logic (e.g., formulas, data sources like position or financial data), "
-                    f"join conditions (e.g., tables like POSITION_FACT or LINE_ITEM joined with dimensions), "
-                    f"filter conditions (e.g., specific versions or scenarios), "
-                    f"and its business significance in budgeting or planning. "
-                    f"Ensure the response is clear, specific, avoids document references, and directly addresses the metric."
+                    f"Provide a detailed and concise explanation for the query '{user_question}' in the context of the Grants Management system for FY {fiscal_year}. "
+                    f"Describe the metric’s definition (e.g., Total Award Amount, Active Grants Count), calculation logic (e.g., aggregation of award or grant activity data), "
+                    f"join conditions (e.g., tables like GRANT_AWARD or GRANT_ACTIVITY joined with dimensions like GRANTEE or FUNDING_SOURCE), "
+                    f"filter conditions (e.g., specific grant types like FEDERAL or FOUNDATION, or project status like ACTIVE or CLOSED), "
+                    f"and its business significance in grant management, reporting, or compliance. Include relevant dimensions (e.g., Grantee, Funding Source, Grant Type). "
+                    f"Ensure the response is clear, concise, avoids document references, and directly addresses the metric."
+
                 )
         elif "facts" in query_lower:
             prompt_instruction = (
-                f"Provide a detailed and concise explanation for the query '{user_question}' in the context of the Planning and Budgeting system. "
-                f"Explain the fact table’s purpose (e.g., LINE_ITEM_FACT or POSITION_FACT), key metrics (e.g., measures like FTE, financial amounts, or headcount), "
-                f"its role in budgeting or analysis, join conditions with dimension tables (e.g., ORGANIZATION, FUND, PROGRAM), "
+                f"Provide a detailed and concise explanation for the query '{user_question}' in the context of the Grants. "
+                f"Explain the fact table’s purpose (e.g., Grants Budget  or PGrants Balance), key metrics (e.g., measures like RAW COST,Burdened Cost , or Category Field ), "
+                f"its role in budgeting or analysis, join conditions with dimension tables (e.g., EXPENDITURE_ITEM_ID, PA_EXPENDITURE_ITEMS_ALL ), "
                 f"and filter conditions used in queries. Include specific dimensions it integrates with. "
                 f"Ensure the response is clear, specific, avoids document references, and directly addresses the fact."
             )
         elif "reports" in query_lower:
             prompt_instruction = (
-                f"Provide a detailed and concise explanation for the query '{user_question}' in the context of the Planning and Budgeting system. "
-                f"Describe the report’s purpose, key metrics or data presented, data sources (e.g., fact tables like LINE_ITEM_FACT), "
+                f"Provide a detailed and concise explanation for the query '{user_question}' in the context of the GRANTS. "
+                f"Describe the report’s purpose, key metrics or data presented, data sources (e.g., fact tables like Grants Budget), "
                 f"join conditions (e.g., joins with dimension tables like ORGANIZATION or PROGRAM), "
                 f"filter conditions (e.g., specific fiscal years or versions), and its business use case in budgeting or planning. "
                 f"Ensure the response is clear, specific, avoids document references, and directly addresses the report."
+
             )
         elif "join" in query_lower or "filter" in query_lower:
             prompt_instruction = (
@@ -289,10 +292,12 @@ def create_prompt(user_question):
             )
         else:
             prompt_instruction = (
-                f"Provide a detailed and concise explanation for the query '{user_question}' in the context of the Planning and Budgeting system. "
-                f"Describe the system, feature, or concept, including its purpose, key components, and business significance. "
-                f"Include relevant details about data sources, join conditions, or filter conditions if applicable. "
+                f"Provide a detailed and concise explanation for the query '{user_question}' in the context of the Grants Management system. "
+                f"Explain the join conditions (e.g., tables like GRANT_AWARD or GRANT_ACTIVITY joined with dimensions like GRANTEE, FUNDING_SOURCE, or PROGRAM) "
+                f"and filter conditions (e.g., specific grant types like FEDERAL, award statuses like ACTIVE, or fiscal years) used in the data model. "
+                f"Describe their purpose and impact on query results in grants management or reporting. "
                 f"Ensure the response is clear, specific, avoids document references, and directly addresses the query."
+
             )
     else:
         prompt_instruction = (
@@ -634,14 +639,14 @@ else:
                 "- [Contact Support](https://support.snowflake.com/s/)"
             )
 
-    st.title("Cortex AI-PBCS Assistant by DiLytics")
+    st.title("Cortex AI-GRANTS Assistant by DiLytics")
     semantic_model_filename = SEMANTIC_MODEL.split("/")[-1]
     st.markdown(f"Semantic Model: `{semantic_model_filename}`")
     init_service_metadata()
 
     # Display welcome message only once, outside of chat history loop
     if not st.session_state.welcome_displayed:
-        welcome_message = "Hi, I am your PBCS Assistant. I can help you explore data, insights and analytics on PBCS (Planning and Budgeting insight solution)."
+        welcome_message = "Hi, I am your GRANTS Assistant. I can help you explore data, insights and analytics on GRANTS ."
         with st.chat_message("assistant"):
             st.markdown(welcome_message, unsafe_allow_html=True)
         # Add to chat_history only if not already present
@@ -651,20 +656,21 @@ else:
 
     st.sidebar.subheader("Sample Questions")
     sample_questions = [
-        "What kind of data can i get using this assistant?",
-        "What are the key subject areas covered in the solution?",
-        "Top 10 Total Amount by Organization and Version?",
-        "Show the top 5 programs with the highest net increase in budget between FY16-17 and FY17-18?",
-        "What are the allocated FTE and allocated amounts for project PJ_1000001 in FY16-17 and FY17-18 under the Working or Final version?",
-        "Give me the data for which Position, Award, and Fund contribute most to the year-on-year budget variance?",
-        "Explain the logic behind Allocated FTE metric?",
-        "Explain the logic behind Net Incr/Decr metric?"
+        "posted budget by award number",
+        "give me year wise total award budget posted,actual award posted,award ecumbrance posted,award encumbrance approved",
+        "give me award breakdown",
+        "give me year wise award budget posted and award budget approved",
+        "sums of actual posted,budget posted,encumbrance approved,encumbrancepending by award full name",
+        "top 5 grants with there award names",
+        "show me sum of task actual posted by award name",
+        "In which year the first grant approved",
+        "total burdened cost vs total raw cost"
     ]
 
     # Display chat history without chat bubbles for assistant, skipping the welcome message
     for idx, message in enumerate(st.session_state.chat_history):
         # Skip the welcome message since it's already displayed above
-        if idx == 0 and message["content"] == "Hi, I am your PBCS Assistant. I can help you explore data, insights and analytics on PBCS (Planning and Budgeting insight solution).":
+        if idx == 0 and message["content"] == "Hi, I am your GRANTS Assistant. I can help you explore data, insights and analytics on GRANTS.":
             continue
         if message["role"] == "user":
             with st.chat_message("user"):
