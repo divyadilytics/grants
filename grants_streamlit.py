@@ -534,18 +534,16 @@ else:
             else:
                 return [
                     "What is the total award budget posted by date?",
-                    "Which awards have the highest encumbrances in the current quarter?",
-                    "What is the total amount of award encumbrances approved this month?",
-                    "What is the date-wise breakdown of award budgets?",
-                    "Which awards have pending encumbrances for more than two weeks?"
+                    "Which awards have the highest encumbrances ?",
+                    "What is the total amount of award encumbrances approved?",
+                    "What is the date-wise breakdown of award budgets?"                   
                 ]
         except Exception as e:
             return [
                 "What is the total award budget posted by date?",
-                "Which awards have the highest encumbrances in the current quarter?",
-                "What is the total amount of award encumbrances approved this month?",
-                "What is the date-wise breakdown of award budgets?",
-                "Which awards have pending encumbrances for more than two weeks?"
+                "Which awards have the highest encumbrances ?",
+                "What is the total amount of award encumbrances approved?",
+                "What is the date-wise breakdown of award budgets?"  
             ]
 
     def display_chart_tab(df: pd.DataFrame, prefix: str = "chart", query: str = ""):
