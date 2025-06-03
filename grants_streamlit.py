@@ -388,19 +388,19 @@ def create_prompt(user_question):
     if not prompt_context.strip():
         return complete(st.session_state.model_name, user_question)
     
-  prompt = f"""
-[INST]
-You are a helpful AI assistant for grants management. You must answer **only using** the context provided below. 
+        prompt = f"""
+        [INST]
+         You are a helpful AI assistant for grants management. You must answer **only using** the context provided below. 
 
-If the context is not sufficient, respond with:
-"I couldn't find relevant information in the documents provided."
-
-<chat_history>
-{chat_history_str}
-</chat_history>
-<context>
-{prompt_context}
-</context>
+         If the context is not sufficient, respond with:
+         "I couldn't find relevant information in the documents provided."
+            
+         <chat_history>
+            {chat_history_str}
+            </chat_history>
+            <context>
+            {prompt_context}
+            </context>
 <question>
 {user_question}
 </question>
