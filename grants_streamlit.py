@@ -442,20 +442,38 @@ else:
         try:
             if not query:
                 return None
-            df = session.sql(query)
+            # Identify if query contains award number columns and cast them to VARCHAR
+            award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO", "award_number"]
+            modified_query = query
+            for col in award_number_candidates:
+                # Use regex to find the column in SELECT clause and cast it to VARCHAR
+                pattern = rf'\b{col}\b(?![^,]*AS\b)'
+                if re.search(pattern, query, re.IGNORECASE):
+                    modified_query = re.sub(
+                        rf'\b{col}\b(?![^,]*AS\b)',
+                        f"TO_VARCHAR({col}) AS {col}",
+                        modified_query,
+                        flags=re.IGNORECASE
+                    )
+            if st.session_state.debug_mode:
+                st.sidebar.write(f"Debug: Original SQL Query: {query}")
+                st.sidebar.write(f"Debug: Modified SQL Query: {modified_query}")
+            df = session.sql(modified_query)
             data = df.collect()
             if not data:
                 return None
             columns = df.columns
             result_df = pd.DataFrame(data, columns=columns)
-            # Debug: Print column names to identify the correct award number and date columns
+            # Debug: Print column names and their dtypes
             if st.session_state.debug_mode:
+                st.sidebar.write("Debug - DataFrame Columns and Types:", result_df.dtypes.to_dict())
                 st.write("Debug - DataFrame Columns:", result_df.columns.tolist())
-            # Convert award number columns to strings to prevent 'k' formatting
-            award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO"]
+            # Ensure award number columns are strings (safeguard)
             for col in award_number_candidates:
                 if col in result_df.columns:
                     result_df[col] = result_df[col].astype(str)
+                    if st.session_state.debug_mode:
+                        st.sidebar.write(f"Debug: After astype(str), {col} dtype: {result_df[col].dtype}")
             # Format date columns to YYYY-MM-DD
             date_column_candidates = ["DATE", "AWARD_DATE", "SUBMITTED_AT", "DW_DATE_ALLOCATED_KEY"]
             for col in result_df.columns:
@@ -825,10 +843,12 @@ else:
                 st.markdown(f"**Query Results ({len(message['results'])} rows):**")
                 df_to_display = message["results"].copy()
                 # Ensure award numbers are strings and dates are in YYYY-MM-DD format
-                award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO"]
+                award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO", "award_number"]
                 for col in award_number_candidates:
                     if col in df_to_display.columns:
                         df_to_display[col] = df_to_display[col].astype(str)
+                        if st.session_state.debug_mode:
+                            st.sidebar.write(f"Debug: In chat history, {col} dtype: {df_to_display[col].dtype}")
                 date_column_candidates = ["DATE", "AWARD_DATE", "SUBMITTED_AT", "DW_DATE_ALLOCATED_KEY"]
                 for col in df_to_display.columns:
                     if col in date_column_candidates or "DATE" in col.upper():
@@ -836,10 +856,10 @@ else:
                             df_to_display[col] = pd.to_datetime(df_to_display[col]).dt.strftime('%Y-%m-%d')
                         except (ValueError, TypeError):
                             continue
-                st.dataframe(df_to_display)
+                # Use st.table to avoid numeric formatting
+                st.table(df_to_display)
                 if not df_to_display.empty and len(df_to_display.columns) >= 2:
                     st.markdown("**📈 Visualization:**")
-                    # Use message_id to ensure unique keys
                     message_id = message.get("message_id", 0)
                     chart_prefix = f"chart_{message_id}"
                     display_chart_tab(df_to_display, prefix=chart_prefix, query=message.get("query", ""))
@@ -999,10 +1019,12 @@ else:
                             st.markdown(f"**Query Results ({len(results)} rows):**")
                             df_to_display = results.copy()
                             # Ensure award numbers are strings and dates are in YYYY-MM-DD format
-                            award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO"]
+                            award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO", "award_number"]
                             for col in award_number_candidates:
                                 if col in df_to_display.columns:
                                     df_to_display[col] = df_to_display[col].astype(str)
+                                    if st.session_state.debug_mode:
+                                        st.sidebar.write(f"Debug: In query response, {col} dtype: {df_to_display[col].dtype}")
                             date_column_candidates = ["DATE", "AWARD_DATE", "SUBMITTED_AT", "DW_DATE_ALLOCATED_KEY"]
                             for col in df_to_display.columns:
                                 if col in date_column_candidates or "DATE" in col.upper():
@@ -1010,10 +1032,10 @@ else:
                                         df_to_display[col] = pd.to_datetime(df_to_display[col]).dt.strftime('%Y-%m-%d')
                                     except (ValueError, TypeError):
                                         continue
-                            st.dataframe(df_to_display)
+                            # Use st.table to avoid numeric formatting
+                            st.table(df_to_display)
                             if len(df_to_display.columns) >= 2:
                                 st.markdown("**📈 Visualization:**")
-                                # Use assistant's message_id for chart prefix
                                 chart_prefix = f"chart_{assistant_response['message_id']}"
                                 display_chart_tab(df_to_display, prefix=chart_prefix, query=combined_query)
                             assistant_response.update({
