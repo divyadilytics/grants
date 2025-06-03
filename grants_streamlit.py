@@ -325,10 +325,10 @@ def query_cortex_search_service(query):
         context_str = ""
         for i, r in enumerate(results):
             context_str += f"Context document {i+1}: {r[search_col]} \n"
-        return context_str
+        return context_str, results
     except Exception as e:
         st.error(f"❌ Error querying Cortex Search service: {str(e)}")
-        return ""
+        return "", []
 
 def get_chat_history():
     start_index = max(0, len(st.session_state.chat_history) - st.session_state.num_chat_messages)
@@ -358,26 +358,27 @@ def make_chat_history_summary(chat_history, question):
         st.sidebar.text_area("Chat History Summary", summary.replace("$", "\$"), height=150)
     return summary
 
-def create_prompt(user_question):
+def create_prompt(user_question, search_context):
     chat_history_str = ""
     if st.session_state.use_chat_history:
         chat_history = get_chat_history()
         if chat_history:
             question_summary = make_chat_history_summary(chat_history, user_question)
-            prompt_context = query_cortex_search_service(question_summary)
+            prompt_context, _ = query_cortex_search_service(question_summary)
             chat_history_str = "\n".join([f"{msg['role']}: {msg['content']}" for msg in chat_history])
         else:
-            prompt_context = query_cortex_search_service(user_question)
+            prompt_context = search_context
     else:
-        prompt_context = query_cortex_search_service(user_question)
+        prompt_context = search_context
         chat_history = []
     
     if not prompt_context.strip():
-        return complete(st.session_state.model_name, user_question)
+        return "No relevant information found in the document."
     
     prompt = f"""
         [INST]
-        You are a helpful AI chat assistant for grants management. Use the provided context and chat history to provide a coherent, concise, and relevant answer to the user's question.
+        You are a helpful AI chat assistant for grants management. Answer the user's question using **ONLY** the provided context from the document. Do not use any external knowledge or make assumptions beyond the context given. If the information is not available in the context, respond with "The requested information is not found in the document."
+
         <chat_history>
         {chat_history_str}
         </chat_history>
@@ -391,6 +392,49 @@ def create_prompt(user_question):
         Answer:
     """
     return complete(st.session_state.model_name, prompt)
+
+def extract_metrics_from_search_results(search_results, query):
+    """
+    Extract numerical metrics from search results for metrics-related questions.
+    """
+    query_lower = query.lower()
+    # Keywords indicating a metrics-related question
+    metrics_keywords = ["total", "amount", "number", "count", "sum", "budget", "funding"]
+    is_metrics_query = any(keyword in query_lower for keyword in metrics_keywords)
+    
+    if not is_metrics_query:
+        return None
+
+    # Patterns to match numerical values (e.g., "$500,000", "500000", "5 million")
+    number_patterns = [
+        r'\$\d{1,3}(,\d{3})*(\.\d+)?',  # e.g., $500,000 or $500,000.00
+        r'\d{1,3}(,\d{3})*(\.\d+)?\s*(million|billion|thousand)?',  # e.g., 500,000 or 5 million
+        r'\d+(\.\d+)?\s*(million|billion|thousand)?'  # e.g., 500 or 5.5 million
+    ]
+    
+    extracted_metrics = []
+    for i, result in enumerate(search_results[:5], 1):  # Check top 5 results
+        result_text = result.get(st.session_state.service_metadata[0]["search_column"], "")
+        if not result_text:
+            continue
+        # Look for numbers in the result
+        for pattern in number_patterns:
+            matches = re.finditer(pattern, result_text, re.IGNORECASE)
+            for match in matches:
+                value = match.group(0)
+                # Extract surrounding context (e.g., 20 words before and after the number)
+                start_idx = max(0, match.start() - 50)
+                end_idx = min(len(result_text), match.end() + 50)
+                context_snippet = result_text[start_idx:end_idx].strip()
+                # Check if the context matches the query's intent
+                if any(keyword in context_snippet.lower() for keyword in metrics_keywords):
+                    extracted_metrics.append({
+                        "value": value,
+                        "context": context_snippet,
+                        "document": f"Document {i}"
+                    })
+    
+    return extracted_metrics
 
 def get_user_questions(limit=10):
     user_questions = [msg["content"] for msg in st.session_state.chat_history if msg["role"] == "user"]
@@ -442,28 +486,31 @@ else:
         try:
             if not query:
                 return None
-            df = session.sql(query)
+            modified_query = query
+            if st.session_state.debug_mode:
+                st.sidebar.write(f"Debug: SQL Query: {modified_query}")
+            df = session.sql(modified_query)
             data = df.collect()
             if not data:
                 return None
             columns = df.columns
             result_df = pd.DataFrame(data, columns=columns)
-            # Debug: Print column names to identify the correct award number and date columns
             if st.session_state.debug_mode:
+                st.sidebar.write("Debug - DataFrame Columns and Types:", result_df.dtypes.to_dict())
                 st.write("Debug - DataFrame Columns:", result_df.columns.tolist())
-            # Convert award number columns to strings to prevent 'k' formatting
-            award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO"]
+            award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO", "award_number"]
             for col in award_number_candidates:
                 if col in result_df.columns:
                     result_df[col] = result_df[col].astype(str)
-            # Format date columns to YYYY-MM-DD
+                    if st.session_state.debug_mode:
+                        st.sidebar.write(f"Debug: After astype(str), {col} dtype: {result_df[col].dtype}")
             date_column_candidates = ["DATE", "AWARD_DATE", "SUBMITTED_AT", "DW_DATE_ALLOCATED_KEY"]
             for col in result_df.columns:
                 if col in date_column_candidates or "DATE" in col.upper():
                     try:
                         result_df[col] = pd.to_datetime(result_df[col]).dt.strftime('%Y-%m-%d')
                     except (ValueError, TypeError):
-                        continue  # Skip if the column can't be converted to datetime
+                        continue
             return result_df
         except Exception as e:
             st.error(f"Error executing SQL query: {str(e)}")
@@ -503,7 +550,7 @@ else:
             return result[0]["RESPONSE"]
         except Exception as e:
             st.error(f"Error in COMPLETE function: {str(e)}")
-            return None
+            return "The requested information is not found in the document."
 
     def summarize(text):
         try:
@@ -553,7 +600,7 @@ else:
                                     if is_structured and "sql" in result_data:
                                         sql = result_data.get("sql", "")
                                     elif not is_structured and "searchResults" in result_data:
-                                        search_results = [sr["text"] for sr in result_data["searchResults"]]
+                                        search_results = result_data["searchResults"]
         return sql.strip(), search_results
 
     def snowflake_api_call(query: str, is_structured: bool = False):
@@ -824,11 +871,12 @@ else:
                     st.code(message["sql"], language="sql")
                 st.markdown(f"**Query Results ({len(message['results'])} rows):**")
                 df_to_display = message["results"].copy()
-                # Ensure award numbers are strings and dates are in YYYY-MM-DD format
-                award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO"]
+                award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO", "award_number"]
                 for col in award_number_candidates:
                     if col in df_to_display.columns:
                         df_to_display[col] = df_to_display[col].astype(str)
+                        if st.session_state.debug_mode:
+                            st.sidebar.write(f"Debug: In chat history, {col} dtype: {df_to_display[col].dtype}")
                 date_column_candidates = ["DATE", "AWARD_DATE", "SUBMITTED_AT", "DW_DATE_ALLOCATED_KEY"]
                 for col in df_to_display.columns:
                     if col in date_column_candidates or "DATE" in col.upper():
@@ -836,10 +884,9 @@ else:
                             df_to_display[col] = pd.to_datetime(df_to_display[col]).dt.strftime('%Y-%m-%d')
                         except (ValueError, TypeError):
                             continue
-                st.dataframe(df_to_display)
+                st.table(df_to_display)
                 if not df_to_display.empty and len(df_to_display.columns) >= 2:
                     st.markdown("**📈 Visualization:**")
-                    # Use message_id to ensure unique keys
                     message_id = message.get("message_id", 0)
                     chart_prefix = f"chart_{message_id}"
                     display_chart_tab(df_to_display, prefix=chart_prefix, query=message.get("query", ""))
@@ -878,12 +925,10 @@ else:
             chat_history = get_chat_history()
             if chat_history:
                 combined_query = make_chat_history_summary(chat_history, query)
-        # Safeguard: Ensure message_counter is initialized
         if "message_counter" not in st.session_state:
             st.session_state.message_counter = 0
             if st.session_state.debug_mode:
                 st.sidebar.write("Debug: Re-initialized message_counter to 0 before incrementing")
-        # Increment message counter and assign unique message_id
         st.session_state.message_counter += 1
         if st.session_state.debug_mode:
             st.sidebar.write(f"Debug: Incremented message_counter to {st.session_state.message_counter}")
@@ -906,7 +951,6 @@ else:
                 is_summarize = is_summarize_query(combined_query)
                 is_suggestion = is_question_suggestion_query(combined_query)
                 is_greeting = is_greeting_query(combined_query)
-                # Increment message counter for assistant response
                 if "message_counter" not in st.session_state:
                     st.session_state.message_counter = 0
                     if st.session_state.debug_mode:
@@ -962,7 +1006,8 @@ else:
                     st.session_state.messages.append({"role": "assistant", "content": response_content})
 
                 elif is_complete:
-                    response = create_prompt(combined_query)
+                    search_context, _ = query_cortex_search_service(combined_query)
+                    response = create_prompt(combined_query, search_context)
                     if response:
                         response_content = f"**Generated Response:**\n{response}"
                         response_placeholder.markdown(response_content, unsafe_allow_html=True)
@@ -998,11 +1043,12 @@ else:
                                 st.code(sql, language="sql")
                             st.markdown(f"**Query Results ({len(results)} rows):**")
                             df_to_display = results.copy()
-                            # Ensure award numbers are strings and dates are in YYYY-MM-DD format
-                            award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO"]
+                            award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO", "award_number"]
                             for col in award_number_candidates:
                                 if col in df_to_display.columns:
                                     df_to_display[col] = df_to_display[col].astype(str)
+                                    if st.session_state.debug_mode:
+                                        st.sidebar.write(f"Debug: In query response, {col} dtype: {df_to_display[col].dtype}")
                             date_column_candidates = ["DATE", "AWARD_DATE", "SUBMITTED_AT", "DW_DATE_ALLOCATED_KEY"]
                             for col in df_to_display.columns:
                                 if col in date_column_candidates or "DATE" in col.upper():
@@ -1010,10 +1056,9 @@ else:
                                         df_to_display[col] = pd.to_datetime(df_to_display[col]).dt.strftime('%Y-%m-%d')
                                     except (ValueError, TypeError):
                                         continue
-                            st.dataframe(df_to_display)
+                            st.table(df_to_display)
                             if len(df_to_display.columns) >= 2:
                                 st.markdown("**📈 Visualization:**")
-                                # Use assistant's message_id for chart prefix
                                 chart_prefix = f"chart_{assistant_response['message_id']}"
                                 display_chart_tab(df_to_display, prefix=chart_prefix, query=combined_query)
                             assistant_response.update({
@@ -1042,16 +1087,40 @@ else:
                     response = snowflake_api_call(combined_query, is_structured=False)
                     _, search_results = process_sse_response(response, is_structured=False)
                     if search_results:
-                        raw_result = search_results[0]
-                        summary = create_prompt(combined_query)
-                        if summary:
-                            response_content = f"**Answer:**\n{summary}"
+                        # Fetch the search context for debugging and prompt creation
+                        search_context, raw_results = query_cortex_search_service(combined_query)
+                        if st.session_state.debug_mode:
+                            st.sidebar.write("Debug: Search Context from Cortex Search Service:", search_context)
+                            st.sidebar.write("Debug: Raw Search Results (Top 5):", [result[st.session_state.service_metadata[0]["search_column"]][:200] + "..." if len(result[st.session_state.service_metadata[0]["search_column"]]) > 200 else result[st.session_state.service_metadata[0]["search_column"]] for result in raw_results[:5]])
+                        
+                        # Try to extract metrics directly from search results
+                        metrics = extract_metrics_from_search_results(raw_results, combined_query)
+                        if metrics:
+                            response_content = "**Extracted Metrics:**\n"
+                            for metric in metrics:
+                                response_content += f"- {metric['value']} (from {metric['document']})\n"
+                                response_content += f"  Context: {metric['context']}\n\n"
                         else:
-                            response_content = f"**Key Information:**\n{summarize_unstructured_answer(raw_result)}"
+                            # Fallback to create_prompt with strict instructions
+                            summary = create_prompt(combined_query, search_context)
+                            response_content = f"**Answer:**\n{summary}\n\n"
+                        
+                        # Add top search results as reference
+                        response_content += "**Relevant Excerpts:**\n"
+                        for i, result in enumerate(raw_results[:3], 1):
+                            result_text = result.get(st.session_state.service_metadata[0]["search_column"], "")
+                            sentences = re.split(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|")\s', result_text.strip())
+                            excerpt = "\n".join(f"  • {sent.strip()}" for sent in sentences[:3] if sent.strip())
+                            response_content += f"**Document {i}:**\n{excerpt}\n\n"
+                        
                         response_placeholder.markdown(response_content, unsafe_allow_html=True)
                         assistant_response["content"] = response_content
                         st.session_state.messages.append({"role": "assistant", "content": response_content})
                     else:
+                        response_content = "No relevant information found in the document."
+                        response_placeholder.markdown(response_content, unsafe_allow_html=True)
+                        assistant_response["content"] = response_content
+                        st.session_state.messages.append({"role": "assistant", "content": response_content})
                         failed_response = True
 
                 if failed_response:
