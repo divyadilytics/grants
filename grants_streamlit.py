@@ -225,7 +225,7 @@ def init_service_metadata():
         svc_search_col = session.sql("DESC CORTEX SEARCH SERVICE AI.DWH_MART.GRANTS_SEARCH_SERVICES;").collect()[0]["search_column"]
         st.session_state.service_metadata = [{"name": "AI.DWH_MART.GRANTS_SEARCH_SERVICES", "search_column": svc_search_col}]
     except Exception as e:
-        st.error(f"❌ Failed to verify AI.DWH_MART.GRANTS_SEARCH_SERVICES: {str(e)}.")
+        st.error(f"❌ Failed to verify AI.DWH_MART.GRANTS_SEARCH_SERVICES: {str(e)}")
 
 def query_cortex_search_service(query):
     try:
@@ -370,7 +370,7 @@ else:
     def is_structured_query(query: str):
         structured_patterns = [
             r'\b(count|number|where|group by|order by|sum|avg|max|min|total|how many|which|show|list)\b',
-            r'\b(grant|award|funding|recipient|application|status|amount)\b'
+            r'\b(grant|award|funding|recipient|application|status|amount|budget|encumbrance|posted|approved|task|actual)\b'
         ]
         return any(re.search(pattern, query.lower()) for pattern in structured_patterns)
 
@@ -508,16 +508,16 @@ else:
                 return questions[:5]
             else:
                 return [
-                    "What is the total number of grants awarded?",
-                    "Which organizations received the most funding?",
+                    "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
+                    "What is the total award encumbrance posted for these awards?",
                     "What is the average grant amount by category?",
                     "Which grants are expiring soon?",
                     "What is the total funding awarded by year?"
                 ]
         except Exception as e:
             return [
-                "What is the total number of grants awarded?",
-                "Which organizations received the most funding?",
+                "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
+                "What is the total award encumbrance posted for these awards?",
                 "What is the average grant amount by category?",
                 "Which grants are expiring soon?",
                 "What is the total funding awarded by year?"
@@ -631,14 +631,19 @@ else:
         if st.session_state.get("show_sample_questions", False):
             st.markdown("### Sample Questions")
             sample_questions = [
-                "What is Grants Management?",
-                "Total number of grants awarded?",
-                "What is the number of grants by funding status?",
-                "What is the total funding awarded by year?",
-                "What is the average grant amount by category?",
-                "Which grants are expiring soon?",
-                "Which organizations have received the most funding?",
-                "Which grant applications are pending?"
+                "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
+                "Give me date wise award breakdowns",
+                "Give me award breakdowns",
+                "Give me date wise award budget, actual award posted, award encumbrance posted, award encumbrance approved",
+                "What is the task actual posted by award name?",
+                "What is the award budget posted by date for these awards?",
+                "What is the total award encumbrance posted for these awards?",
+                "What is the total amount of award encumbrances approved?",
+                "What is the total actual award posted for these awards?",
+                "What is the award budget posted?",
+                "What is this document about",
+                "Subject areas",
+                "Explain five layers in High level Architecture"
             ]
             for sample in sample_questions:
                 if st.button(sample, key=f"sidebar_{sample}"):
@@ -759,7 +764,7 @@ else:
             st.markdown(original_query)
         with st.chat_message("assistant"):
             with st.spinner("Generating Response..."):
-                response_placeholder = st.empty
+                response_placeholder = st.empty()
                 if st.session_state.data_source not in ["Database", "Document"]:
                     st.session_state.data_source = "Database"
                 is_structured = is_structured_query(combined_query) and st.session_state.data_source == "Database"
@@ -777,16 +782,15 @@ else:
                         "Here are some questions you can try:\n"
                     )
                     suggestions = [
-                        "What is the total number of grants awarded?",
-                        "Which organizations received the most funding?",
+                        "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
+                        "What is the total award encumbrance posted for these awards?",
                         "What is the average grant amount by category?",
                         "Which grants are expiring soon?",
                         "What is the total funding awarded by year?"
                     ]
                     for i, suggestion in enumerate(suggestions, 1):
                         response_content += f"{i}. {suggestion}\n"
-                    with response_placeholder:
-                        st.markdown(response_content, unsafe_allow_html=True)
+                    response_placeholder.markdown(response_content, unsafe_allow_html=True)
                     assistant_response["content"] = response_content
                     st.session_state.last_suggestions = suggestions
                     st.session_state.messages.append({"role": "assistant", "content": response_content})
@@ -795,8 +799,7 @@ else:
                     response = create_prompt(combined_query)
                     if response:
                         response_content = f"**✍️ Generated Response:**\n{response}"
-                        with response_placeholder:
-                            st.markdown(response_content, unsafe_allow_html=True)
+                        response_placeholder.markdown(response_content, unsafe_allow_html=True)
                         assistant_response["content"] = response_content
                         st.session_state.messages.append({"role": "assistant", "content": response_content})
                     else:
@@ -806,8 +809,7 @@ else:
                     summary = summarize(combined_query)
                     if summary:
                         response_content = f"**Summary:**\n{summary}"
-                        with response_placeholder:
-                            st.markdown(response_content, unsafe_allow_html=True)
+                        response_placeholder.markdown(response_content, unsafe_allow_html=True)
                         assistant_response["content"] = response_content
                         st.session_state.messages.append({"role": "assistant", "content": response_content})
                     else:
@@ -825,8 +827,7 @@ else:
                             if not summary:
                                 summary = "Unable to generate a summary."
                             response_content = f"**✍️ Generated Response:**\n{summary}"
-                            with response_placeholder:
-                                st.markdown(response_content, unsafe_allow_html=True)
+                            response_placeholder.markdown(response_content, unsafe_allow_html=True)
                             with st.expander("View SQL Query", expanded=False):
                                 st.code(sql, language="sql")
                             st.markdown(f"**Query Results ({len(results)} rows):**")
@@ -866,8 +867,7 @@ else:
                             response_content = f"**Here is the Answer:**\n{summary}"
                         else:
                             response_content = f"**🔍 Key Information:**\n{summarize_unstructured_answer(raw_result)}"
-                        with response_placeholder:
-                            st.markdown(response_content, unsafe_allow_html=True)
+                        response_placeholder.markdown(response_content, unsafe_allow_html=True)
                         assistant_response["content"] = response_content
                         st.session_state.messages.append({"role": "assistant", "content": response_content})
                     else:
@@ -878,8 +878,7 @@ else:
                     response_content = "I am not sure about your question. Here are some questions you can ask me:\n\n"
                     for i, suggestion in enumerate(suggestions, 1):
                         response_content += f"{i}. {suggestion}\n"
-                    with response_placeholder:
-                        st.markdown(response_content, unsafe_allow_html=True)
+                    response_placeholder.markdown(response_content, unsafe_allow_html=True)
                     assistant_response["content"] = response_content
                     st.session_state.last_suggestions = suggestions
                     st.session_state.messages.append({"role": "assistant", "content": response_content})
