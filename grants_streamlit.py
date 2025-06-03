@@ -442,27 +442,20 @@ else:
         try:
             if not query:
                 return None
-            # Remove the TO_VARCHAR casting to avoid Snowpark error (1301)
-            modified_query = query
-            if st.session_state.debug_mode:
-                st.sidebar.write(f"Debug: SQL Query: {modified_query}")
-            df = session.sql(modified_query)
+            df = session.sql(query)
             data = df.collect()
             if not data:
                 return None
             columns = df.columns
             result_df = pd.DataFrame(data, columns=columns)
-            # Debug: Print column names and their dtypes
+            # Debug: Print column names to identify the correct award number and date columns
             if st.session_state.debug_mode:
-                st.sidebar.write("Debug - DataFrame Columns and Types:", result_df.dtypes.to_dict())
                 st.write("Debug - DataFrame Columns:", result_df.columns.tolist())
-            # Ensure award number columns are strings (safeguard)
-            award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO", "award_number"]
+            # Convert award number columns to strings to prevent 'k' formatting
+            award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO"]
             for col in award_number_candidates:
                 if col in result_df.columns:
                     result_df[col] = result_df[col].astype(str)
-                    if st.session_state.debug_mode:
-                        st.sidebar.write(f"Debug: After astype(str), {col} dtype: {result_df[col].dtype}")
             # Format date columns to YYYY-MM-DD
             date_column_candidates = ["DATE", "AWARD_DATE", "SUBMITTED_AT", "DW_DATE_ALLOCATED_KEY"]
             for col in result_df.columns:
@@ -832,12 +825,10 @@ else:
                 st.markdown(f"**Query Results ({len(message['results'])} rows):**")
                 df_to_display = message["results"].copy()
                 # Ensure award numbers are strings and dates are in YYYY-MM-DD format
-                award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO", "award_number"]
+                award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO"]
                 for col in award_number_candidates:
                     if col in df_to_display.columns:
                         df_to_display[col] = df_to_display[col].astype(str)
-                        if st.session_state.debug_mode:
-                            st.sidebar.write(f"Debug: In chat history, {col} dtype: {df_to_display[col].dtype}")
                 date_column_candidates = ["DATE", "AWARD_DATE", "SUBMITTED_AT", "DW_DATE_ALLOCATED_KEY"]
                 for col in df_to_display.columns:
                     if col in date_column_candidates or "DATE" in col.upper():
@@ -845,10 +836,10 @@ else:
                             df_to_display[col] = pd.to_datetime(df_to_display[col]).dt.strftime('%Y-%m-%d')
                         except (ValueError, TypeError):
                             continue
-                # Use st.table to avoid numeric formatting
-                st.table(df_to_display)
+                st.dataframe(df_to_display)
                 if not df_to_display.empty and len(df_to_display.columns) >= 2:
                     st.markdown("**📈 Visualization:**")
+                    # Use message_id to ensure unique keys
                     message_id = message.get("message_id", 0)
                     chart_prefix = f"chart_{message_id}"
                     display_chart_tab(df_to_display, prefix=chart_prefix, query=message.get("query", ""))
@@ -1008,25 +999,23 @@ else:
                             st.markdown(f"**Query Results ({len(results)} rows):**")
                             df_to_display = results.copy()
                             # Ensure award numbers are strings and dates are in YYYY-MM-DD format
-                            award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO", "award_number"]
+                            award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO"]
                             for col in award_number_candidates:
                                 if col in df_to_display.columns:
                                     df_to_display[col] = df_to_display[col].astype(str)
-                                    if st.session_state.debug_mode:
-                                        st.sidebar.write(f"Debug: In query response}, {col} dtype: {df_to_display[col].dtype}")
-                            date_column_candidates = ["DATE", "AWARD_DATE", "SUBMITTED_AT", "DW_DATE", "DW_DATE_ALLOCATED_KEY"]
+                            date_column_candidates = ["DATE", "AWARD_DATE", "SUBMITTED_AT", "DW_DATE_ALLOCATED_KEY"]
                             for col in df_to_display.columns:
                                 if col in date_column_candidates or "DATE" in col.upper():
                                     try:
                                         df_to_display[col] = pd.to_datetime(df_to_display[col]).dt.strftime('%Y-%m-%d')
                                     except (ValueError, TypeError):
-                                        pass
-                            # Use st.table to avoid numeric formatting
-                            st.table(df_to_display)
+                                        continue
+                            st.dataframe(df_to_display)
                             if len(df_to_display.columns) >= 2:
                                 st.markdown("**📈 Visualization:**")
+                                # Use assistant's message_id for chart prefix
                                 chart_prefix = f"chart_{assistant_response['message_id']}"
-                                display_chart(df_to_display, prefix=chart_prefix, query=combined_query)
+                                display_chart_tab(df_to_display, prefix=chart_prefix, query=combined_query)
                             assistant_response.update({
                                 "content": response_content,
                                 "sql": sql,
@@ -1061,7 +1050,7 @@ else:
                             response_content = f"**Key Information:**\n{summarize_unstructured_answer(raw_result)}"
                         response_placeholder.markdown(response_content, unsafe_allow_html=True)
                         assistant_response["content"] = response_content
-                        st.session_state.messages.append({"role": "assistant"})
+                        st.session_state.messages.append({"role": "assistant", "content": response_content})
                     else:
                         failed_response = True
 
@@ -1073,7 +1062,7 @@ else:
                     response_placeholder.markdown(response_content, unsafe_allow_html=True)
                     assistant_response["content"] = response_content
                     st.session_state.last_suggestions = suggestions
-                    st.session_state.message.append({"role": "assistant", "content": response_content})
+                    st.session_state.messages.append({"role": "assistant", "content": response_content})
 
                 st.session_state.chat_history.append(assistant_response)
                 st.session_state.current_query = combined_query
