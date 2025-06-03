@@ -1058,8 +1058,8 @@ else:
                         assistant_response["content"] = response_content
 
                         elif st.session_state.data_source == "Document":
-    response = snowflake_api_call(combined_query, is_structured=False)
-    _, search_results = process_sse_response(response, is_structured=False)
+                             response = snowflake_api_call(combined_query, is_structured=False)
+                              _, search_results = process_sse_response(response, is_structured=False)
 
     if search_results:
         prompt_context = "\n".join(search_results)
