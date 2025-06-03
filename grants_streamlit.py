@@ -309,26 +309,31 @@ def init_service_metadata():
 
 def query_cortex_search_service(query):
     try:
+        keywords = extract_keywords_from_query(query)
+        keyword_boost = " ".join(keywords)
+        enhanced_query = f"{query}. Keywords: {keyword_boost}" if keyword_boost else query
+
         db, schema = session.get_current_database(), session.get_current_schema()
         root = Root(session)
         cortex_search_service = (
             root.databases[db]
             .schemas[schema]
-            .cortex_search_services["AI.DWH_MART.GRANTS_SEARCH_SERVICES"]
+            .cortex_search_services[st.session_state.selected_cortex_search_service.split('.')[-1]]
         )
+
         context_documents = cortex_search_service.search(
-            query, columns=[], limit=st.session_state.num_retrieved_chunks
+            enhanced_query, columns=[], limit=st.session_state.num_retrieved_chunks
         )
         results = context_documents.results
-        service_metadata = st.session_state.service_metadata
-        search_col = service_metadata[0]["search_column"]
+        search_col = st.session_state.service_metadata[0]["search_column"]
         context_str = ""
         for i, r in enumerate(results):
-            context_str += f"Context document {i+1}: {r[search_col]} \n"
-        return context_str
+            context_str += f"Context document {i+1}: {r[search_col]} \n\n"
+        return context_str.strip()
     except Exception as e:
         st.error(f"❌ Error querying Cortex Search service: {str(e)}")
         return ""
+
 
 def get_chat_history():
     start_index = max(0, len(st.session_state.chat_history) - st.session_state.num_chat_messages)
