@@ -263,6 +263,14 @@ def stream_text(text: str, chunk_size: int = 2, delay: float = 0.04):
     for i in range(0, len(text), chunk_size):
         yield text[i:i + chunk_size]
         time.sleep(delay)
+def extract_keywords_from_query(query: str, top_n: int = 5) -> List[str]:
+    stopwords = {
+        "what", "which", "is", "the", "a", "an", "are", "how", "much", "many", "who", "does", "do",
+        "get", "have", "has", "i", "we", "they", "you", "can", "be", "to", "from"
+    }
+    words = re.findall(r'\b\w+\b', query.lower())
+    keywords = [word for word in words if word not in stopwords and len(word) > 2]
+    return keywords[:top_n]
 
 def submit_grant_application(grant_id: str, applicant_name: str, application_details: str):
     try:
