@@ -243,72 +243,76 @@ def create_prompt(user_question):
         return complete(st.session_state.model_name, user_question)
     
     if is_specific_unstructured:
-        if "metric" in query_lower:
-            if re.search(r'fy\s?\d{2}-\d{2}', query_lower):
-                fiscal_year = re.search(r'fy\s?(\d{2}-\d{2})', query_lower).group(1)
-                prompt_instruction = (
-                    f"Provide a detailed and concise explanation for the query '{user_question}' in the context of the Grants Management system for FY {fiscal_year}. "
-                    f"Describe the metric’s definition (e.g., Total Award Amount, Active Grants Count), calculation logic (e.g., aggregation of award or grant activity data), "
-                    f"join conditions (e.g., tables like GRANT_AWARD or GRANT_ACTIVITY joined with dimensions like GRANTEE or FUNDING_SOURCE), "
-                    f"filter conditions (e.g., specific grant types like FEDERAL or FOUNDATION, or project status like ACTIVE or CLOSED), "
-                    f"and its business significance in grant management, reporting, or compliance. Include relevant dimensions (e.g., Grantee, Funding Source, Grant Type). "
-                    f"Ensure the response is clear, concise, avoids document references, and directly addresses the metric."
+    query_lower = user_question.lower()
 
-                )
-            else:
-                prompt_instruction = (
-                    f"Provide a detailed and concise explanation for the query '{user_question}' in the context of the Grants Management system for FY {fiscal_year}. "
-                    f"Describe the metric’s definition (e.g., Total Award Amount, Active Grants Count), calculation logic (e.g., aggregation of award or grant activity data), "
-                    f"join conditions (e.g., tables like GRANT_AWARD or GRANT_ACTIVITY joined with dimensions like GRANTEE or FUNDING_SOURCE), "
-                    f"filter conditions (e.g., specific grant types like FEDERAL or FOUNDATION, or project status like ACTIVE or CLOSED), "
-                    f"and its business significance in grant management, reporting, or compliance. Include relevant dimensions (e.g., Grantee, Funding Source, Grant Type). "
-                    f"Ensure the response is clear, concise, avoids document references, and directly addresses the metric."
-
-                )
-        elif "facts" in query_lower:
+    if "metric" in query_lower:
+        fy_match = re.search(r'fy\s?(\d{2}-\d{2})', query_lower)
+        if fy_match:
+            fiscal_year = fy_match.group(1)
             prompt_instruction = (
-                f"Provide a detailed and concise explanation for the query '{user_question}' in the context of the Grants. "
-                f"Explain the fact table’s purpose (e.g., Grants Budget  or PGrants Balance), key metrics (e.g., measures like RAW COST,Burdened Cost , or Category Field ), "
-                f"its role in budgeting or analysis, join conditions with dimension tables (e.g., EXPENDITURE_ITEM_ID, PA_EXPENDITURE_ITEMS_ALL ), "
-                f"and filter conditions used in queries. Include specific dimensions it integrates with. "
-                f"Ensure the response is clear, specific, avoids document references, and directly addresses the fact."
-            )
-        elif "reports" in query_lower:
-            prompt_instruction = (
-                f"Provide a detailed and concise explanation for the query '{user_question}' in the context of the GRANTS. "
-                f"Describe the report’s purpose, key metrics or data presented, data sources (e.g., fact tables like Grants Budget), "
-                f"join conditions (e.g., joins with dimension tables like ORGANIZATION or PROGRAM), "
-                f"filter conditions (e.g., specific fiscal years or versions), and its business use case in budgeting or planning. "
-                f"Ensure the response is clear, specific, avoids document references, and directly addresses the report."
-
-            )
-        elif "join" in query_lower or "filter" in query_lower:
-            prompt_instruction = (
-                f"Provide a detailed and concise explanation for the query '{user_question}' in the context of the Planning and Budgeting system. "
-                f"Explain the join conditions (e.g., tables like POSITION_FACT or LINE_ITEM_FACT joined with dimensions like ORGANIZATION, FUND, or PROGRAM) "
-                f"and filter conditions (e.g., specific versions like COUNCIL1, scenarios like FORECASTING, or fiscal years) used in the data model. "
-                f"Describe their purpose and impact on query results in budgeting or planning. "
-                f"Ensure the response is clear, specific, avoids document references, and directly addresses the query."
+                f"Provide a detailed and concise explanation for the query '{user_question}' in the context of the Grants Management system for FY {fiscal_year}. "
+                f"Describe the metric’s definition (e.g., Total Award Amount, Active Grants Count), calculation logic (e.g., aggregation of award or grant activity data), "
+                f"join conditions (e.g., tables like GRANT_AWARD or GRANT_ACTIVITY joined with dimensions like GRANTEE or FUNDING_SOURCE), "
+                f"filter conditions (e.g., specific grant types like FEDERAL or FOUNDATION, or project status like ACTIVE or CLOSED), "
+                f"and its business significance in grant management, reporting, or compliance. Include relevant dimensions (e.g., Grantee, Funding Source, Grant Type). "
+                f"Ensure the response is clear, concise, avoids document references, and directly addresses the metric."
             )
         else:
             prompt_instruction = (
                 f"Provide a detailed and concise explanation for the query '{user_question}' in the context of the Grants Management system. "
-                f"Explain the join conditions (e.g., tables like GRANT_AWARD or GRANT_ACTIVITY joined with dimensions like GRANTEE, FUNDING_SOURCE, or PROGRAM) "
-                f"and filter conditions (e.g., specific grant types like FEDERAL, award statuses like ACTIVE, or fiscal years) used in the data model. "
-                f"Describe their purpose and impact on query results in grants management or reporting. "
-                f"Ensure the response is clear, specific, avoids document references, and directly addresses the query."
-
+                f"Describe the metric’s definition (e.g., Total Award Amount, Active Grants Count), calculation logic (e.g., aggregation of award or grant activity data), "
+                f"join conditions (e.g., tables like GRANT_AWARD or GRANT_ACTIVITY joined with dimensions like GRANTEE or FUNDING_SOURCE), "
+                f"filter conditions (e.g., specific grant types like FEDERAL or FOUNDATION, or project status like ACTIVE or CLOSED), "
+                f"and its business significance in grant management, reporting, or compliance. Include relevant dimensions (e.g., Grantee, Funding Source, Grant Type). "
+                f"Ensure the response is clear, concise, avoids document references, and directly addresses the metric."
             )
+
+    elif "facts" in query_lower:
+        prompt_instruction = (
+            f"Provide a detailed and concise explanation for the query '{user_question}' in the context of the Grants. "
+            f"Explain the fact table’s purpose (e.g., Grants Budget or PGrants Balance), key metrics (e.g., RAW COST, Burdened Cost, or Category Field), "
+            f"its role in budgeting or analysis, join conditions with dimension tables (e.g., EXPENDITURE_ITEM_ID, PA_EXPENDITURE_ITEMS_ALL), "
+            f"and filter conditions used in queries. Include specific dimensions it integrates with. "
+            f"Ensure the response is clear, specific, avoids document references, and directly addresses the fact."
+        )
+
+    elif "reports" in query_lower:
+        prompt_instruction = (
+            f"Provide a detailed and concise explanation for the query '{user_question}' in the context of the Grants. "
+            f"Describe the report’s purpose, key metrics or data presented, data sources (e.g., fact tables like Grants Budget), "
+            f"join conditions (e.g., joins with dimension tables like ORGANIZATION or PROGRAM), "
+            f"filter conditions (e.g., specific fiscal years or versions), and its business use case in budgeting or planning. "
+            f"Ensure the response is clear, specific, avoids document references, and directly addresses the report."
+        )
+
+    elif "join" in query_lower or "filter" in query_lower:
+        prompt_instruction = (
+            f"Provide a detailed and concise explanation for the query '{user_question}' in the context of the Planning and Budgeting system. "
+            f"Explain the join conditions (e.g., tables like POSITION_FACT or LINE_ITEM_FACT joined with dimensions like ORGANIZATION, FUND, or PROGRAM) "
+            f"and filter conditions (e.g., specific versions like COUNCIL1, scenarios like FORECASTING, or fiscal years) used in the data model. "
+            f"Describe their purpose and impact on query results in budgeting or planning. "
+            f"Ensure the response is clear, specific, avoids document references, and directly addresses the query."
+        )
+
     else:
         prompt_instruction = (
-            f"You are a helpful AI chat assistant with RAG capabilities. When a user asks you a question, "
-            f"you will also be given context provided between <context> and </context> tags. Use that context "
-            f"with the user's chat history provided between <chat_history> and </chat_history> tags "
-            f"to provide a summary that addresses the user's question. Ensure the answer is coherent, concise, "
-            f"and directly relevant to the user's question. "
-            f"If the user asks a generic question which cannot be answered with the given context or chat_history, "
-            f"just respond directly and concisely to the user's question using the LLM."
+            f"Provide a detailed and concise explanation for the query '{user_question}' in the context of the Grants Management system. "
+            f"Explain the join conditions (e.g., tables like GRANT_AWARD or GRANT_ACTIVITY joined with dimensions like GRANTEE, FUNDING_SOURCE, or PROGRAM) "
+            f"and filter conditions (e.g., specific grant types like FEDERAL, award statuses like ACTIVE, or fiscal years) used in the data model. "
+            f"Describe their purpose and impact on query results in grants management or reporting. "
+            f"Ensure the response is clear, specific, avoids document references, and directly addresses the query."
         )
+else:
+    prompt_instruction = (
+        f"You are a helpful AI chat assistant with RAG capabilities. When a user asks you a question, "
+        f"you will also be given context provided between <context> and </context> tags. Use that context "
+        f"with the user's chat history provided between <chat_history> and </chat_history> tags "
+        f"to provide a summary that addresses the user's question. Ensure the answer is coherent, concise, "
+        f"and directly relevant to the user's question. "
+        f"If the user asks a generic question which cannot be answered with the given context or chat_history, "
+        f"just respond directly and concisely to the user's question using the LLM."
+    )
+
 
     prompt = f"""
         [INST]
