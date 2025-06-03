@@ -442,22 +442,10 @@ else:
         try:
             if not query:
                 return None
-            # Identify if query contains award number columns and cast them to VARCHAR
-            award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO", "award_number"]
+            # Remove the TO_VARCHAR casting to avoid Snowpark error (1301)
             modified_query = query
-            for col in award_number_candidates:
-                # Use regex to find the column in SELECT clause and cast it to VARCHAR
-                pattern = rf'\b{col}\b(?![^,]*AS\b)'
-                if re.search(pattern, query, re.IGNORECASE):
-                    modified_query = re.sub(
-                        rf'\b{col}\b(?![^,]*AS\b)',
-                        f"TO_VARCHAR({col}) AS {col}",
-                        modified_query,
-                        flags=re.IGNORECASE
-                    )
             if st.session_state.debug_mode:
-                st.sidebar.write(f"Debug: Original SQL Query: {query}")
-                st.sidebar.write(f"Debug: Modified SQL Query: {modified_query}")
+                st.sidebar.write(f"Debug: SQL Query: {modified_query}")
             df = session.sql(modified_query)
             data = df.collect()
             if not data:
@@ -469,6 +457,7 @@ else:
                 st.sidebar.write("Debug - DataFrame Columns and Types:", result_df.dtypes.to_dict())
                 st.write("Debug - DataFrame Columns:", result_df.columns.tolist())
             # Ensure award number columns are strings (safeguard)
+            award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO", "award_number"]
             for col in award_number_candidates:
                 if col in result_df.columns:
                     result_df[col] = result_df[col].astype(str)
@@ -1024,20 +1013,20 @@ else:
                                 if col in df_to_display.columns:
                                     df_to_display[col] = df_to_display[col].astype(str)
                                     if st.session_state.debug_mode:
-                                        st.sidebar.write(f"Debug: In query response, {col} dtype: {df_to_display[col].dtype}")
-                            date_column_candidates = ["DATE", "AWARD_DATE", "SUBMITTED_AT", "DW_DATE_ALLOCATED_KEY"]
+                                        st.sidebar.write(f"Debug: In query response}, {col} dtype: {df_to_display[col].dtype}")
+                            date_column_candidates = ["DATE", "AWARD_DATE", "SUBMITTED_AT", "DW_DATE", "DW_DATE_ALLOCATED_KEY"]
                             for col in df_to_display.columns:
                                 if col in date_column_candidates or "DATE" in col.upper():
                                     try:
                                         df_to_display[col] = pd.to_datetime(df_to_display[col]).dt.strftime('%Y-%m-%d')
                                     except (ValueError, TypeError):
-                                        continue
+                                        pass
                             # Use st.table to avoid numeric formatting
                             st.table(df_to_display)
                             if len(df_to_display.columns) >= 2:
                                 st.markdown("**📈 Visualization:**")
                                 chart_prefix = f"chart_{assistant_response['message_id']}"
-                                display_chart_tab(df_to_display, prefix=chart_prefix, query=combined_query)
+                                display_chart(df_to_display, prefix=chart_prefix, query=combined_query)
                             assistant_response.update({
                                 "content": response_content,
                                 "sql": sql,
@@ -1072,7 +1061,7 @@ else:
                             response_content = f"**Key Information:**\n{summarize_unstructured_answer(raw_result)}"
                         response_placeholder.markdown(response_content, unsafe_allow_html=True)
                         assistant_response["content"] = response_content
-                        st.session_state.messages.append({"role": "assistant", "content": response_content})
+                        st.session_state.messages.append({"role": "assistant"})
                     else:
                         failed_response = True
 
@@ -1084,7 +1073,7 @@ else:
                     response_placeholder.markdown(response_content, unsafe_allow_html=True)
                     assistant_response["content"] = response_content
                     st.session_state.last_suggestions = suggestions
-                    st.session_state.messages.append({"role": "assistant", "content": response_content})
+                    st.session_state.message.append({"role": "assistant", "content": response_content})
 
                 st.session_state.chat_history.append(assistant_response)
                 st.session_state.current_query = combined_query
