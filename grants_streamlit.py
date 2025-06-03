@@ -1,3 +1,4 @@
+```python
 import streamlit as st
 import json
 import re
@@ -302,19 +303,25 @@ def init_service_metadata():
     if not st.session_state.service_metadata:
         st.session_state.service_metadata = [{"name": "AI.DWH_MART.GRANTS_SEARCH_SERVICES", "search_column": ""}]
     try:
-        svc_search_col = session.sql("DESC CORTEX SEARCH SERVICE AI.DWH_MART.GRANTS_SEARCH_SERVICES;").collect()[0]["search_column"]
-        st.session_state.service_metadata = [{"name": "AI.DWH_MART.GRANTS_SEARCH_SERVICES", "search_column": svc_search_col}]
+        svc_search_col = session.sql(f"DESC CORTEX SEARCH SERVICE {st.session_state.selected_cortex_search_service};").collect()[0]["search_column"]
+        service_name = st.session_state.selected_cortex_search_service.split(".")[-1]
+        st.session_state.service_metadata = [{"name": st.session_state.selected_cortex_search_service, "service_name": service_name, "search_column": svc_search_col}]
+        if st.session_state.debug_mode:
+            st.sidebar.write(f"Debug: Initialized service metadata - Full Name: {st.session_state.selected_cortex_search_service}, Service Name: {service_name}, Search Column: {svc_search_col}")
     except Exception as e:
-        st.error(f"❌ Failed to verify AI.DWH_MART.GRANTS_SEARCH_SERVICES: {str(e)}")
+        st.error(f"❌ Failed to verify {st.session_state.selected_cortex_search_service}: {str(e)}")
 
 def query_cortex_search_service(query):
     try:
         db, schema = session.get_current_database(), session.get_current_schema()
         root = Root(session)
+        service_name = st.session_state.selected_cortex_search_service.split(".")[-1]
+        if st.session_state.debug_mode:
+            st.sidebar.write(f"Debug: Accessing Cortex Search Service - Database: {db}, Schema: {schema}, Service Name: {service_name}")
         cortex_search_service = (
             root.databases[db]
             .schemas[schema]
-            .cortex_search_services["AI.DWH_MART.GRANTS_SEARCH_SERVICES"]
+            .cortex_search_services[service_name]
         )
         context_documents = cortex_search_service.search(
             query, columns=[], limit=st.session_state.num_retrieved_chunks
@@ -398,14 +405,12 @@ def extract_metrics_from_search_results(search_results, query):
     Extract numerical metrics from search results for metrics-related questions.
     """
     query_lower = query.lower()
-    # Keywords indicating a metrics-related question
     metrics_keywords = ["total", "amount", "number", "count", "sum", "budget", "funding"]
     is_metrics_query = any(keyword in query_lower for keyword in metrics_keywords)
     
     if not is_metrics_query:
         return None
 
-    # Patterns to match numerical values (e.g., "$500,000", "500000", "5 million")
     number_patterns = [
         r'\$\d{1,3}(,\d{3})*(\.\d+)?',  # e.g., $500,000 or $500,000.00
         r'\d{1,3}(,\d{3})*(\.\d+)?\s*(million|billion|thousand)?',  # e.g., 500,000 or 5 million
@@ -417,16 +422,13 @@ def extract_metrics_from_search_results(search_results, query):
         result_text = result.get(st.session_state.service_metadata[0]["search_column"], "")
         if not result_text:
             continue
-        # Look for numbers in the result
         for pattern in number_patterns:
             matches = re.finditer(pattern, result_text, re.IGNORECASE)
             for match in matches:
                 value = match.group(0)
-                # Extract surrounding context (e.g., 20 words before and after the number)
                 start_idx = max(0, match.start() - 50)
                 end_idx = min(len(result_text), match.end() + 50)
                 context_snippet = result_text[start_idx:end_idx].strip()
-                # Check if the context matches the query's intent
                 if any(keyword in context_snippet.lower() for keyword in metrics_keywords):
                     extracted_metrics.append({
                         "value": value,
@@ -680,69 +682,57 @@ else:
             query_lower = query.lower()
             if re.search(r'\b(category|type)\b', query_lower):
                 default_data = "Pie Chart"
-            elif re.search(r'\b(year|date)\b', query_lower):
+            elif re.search(r'\b(year|type)d in\b', query_lower):
                 default_data = "Line Chart"
             else:
                 default_data = "Bar Chart"
             all_cols = list(df.columns)
-            numeric_cols = [col for col in all_cols if pd.api.types.is_numeric_dtype(df[col])]
+            numeric_cols = [col for col in df.columns if pd.api.types.is_numeric_type(df.columns)]
             y_options = numeric_cols + ["All Columns"]
             col1, col2, col3 = st.columns(3)
-            x_col = col1.selectbox("X axis", all_cols, index=0, key=f"{prefix}_x")
-            remaining_cols = [c for c in y_options if c != x_col]
-            y_col = col2.selectbox("Y axis", remaining_cols, index=0, key=f"{prefix}_y")
-            chart_options = ["Line Chart", "Bar Chart", "Pie Chart", "Scatter Chart", "Histogram Chart"]
-            chart_type = col3.selectbox("Chart Type", chart_options, index=chart_options.index(default_data), key=f"{prefix}_type")
+            x_col = col1.selectbox("X axis", all_cols, index=0, key=f"{prefix}_colum1")
+            remaining_cols = [c for c in y_cols if c != x_cols]:
+            y_col = col2.selectbox("Y axis", remaining_cols, index=0, key=f"{prefix}_colum2")
+            chart_options = ["Line Chart", "Bar Chart", "Pie Chart", "Pie Chart", "Scatter Chart", "pie chart"]
+            chart_type = col3.selectbox("Chart Type", chart_options, index=chart_options.indexOf(default_data), key=f"{prefix}_data")
             if y_col == "All Columns":
-                df_melted = pd.melt(df, id_vars=[x_col], value_vars=numeric_cols, var_name="Variable", value_name="Value")
-                if chart_type == "Line Chart":
-                    fig = px.line(df_melted, x=x_col, y="Value", color="Variable", title=chart_type)
-                    st.plotly_chart(fig, key=f"{prefix}_line")
-                elif chart_type == "Bar Chart":
-                    fig = px.bar(df_melted, x=x_col, y="Value", color="Variable", title=chart_type)
-                    st.plotly_chart(fig, key=f"{prefix}_bar")
-                elif chart_type == "Pie Chart":
-                    fig = px.pie(df_melted, names=x_col, values="Value", title=chart_type)
-                    st.plotly_chart(fig, key=f"{prefix}_pie")
-                elif chart_type == "Scatter Chart":
-                    fig = px.scatter(df_melted, x=x_col, y="Value", color="Variable", title=chart_type)
-                    st.plotly_chart(fig, key=f"{prefix}_scatter")
-                elif chart_type == "Histogram Chart":
-                    fig = px.histogram(df_melted, x=x_col, y="Value", color="Variable", title=chart_type)
-                    st.plotly_chart(fig, key=f"{prefix}_hist")
+                return
+            df_melted = pd.melt(df, id_vars=[x_col], value_vars=[numeric_cols], var_name="columns", value_name="Column Name")
+            if chart_type == "Line Chart":
+                fig = px.line(df_melted, x=x_col, y="Column Name", color="Name", y_melted)
+                st.plotly_chart(fig, key=f"{prefix}_line")
+            elif chart_type == "Bar Chart":
+                fig = px.bar(df_melted, x=x_col, y_melted, color="Name", title)
+                st.plotly_chart(fig_melted, key=f"{prefix}_bar")
             else:
-                if chart_type == "Line Chart":
-                    fig = px.line(df, x=x_col, y=y_col, title=chart_type)
-                    st.plotly_chart(fig, key=f"{prefix}_line")
-                elif chart_type == "Bar Chart":
-                    fig = px.bar(df, x=x_col, y=y_col, title=chart_type)
-                    st.plotly_chart(fig, key=f"{prefix}_bar")
-                elif chart_type == "Pie Chart":
-                    fig = px.pie(df, names=x_col, values=y_col, title=chart_type)
-                    st.plotly_chart(fig, key=f"{prefix}_pie")
-                elif chart_type == "Scatter Chart":
-                    fig = px.scatter(df, x=x_col, y=y_col, title=chart_type)
-                    st.plotly_chart(fig, key=f"{prefix}_scatter")
-                elif chart_type == "Histogram Chart":
-                    fig = px.histogram(df, x=x_col, y=y_col, title=chart_type)
-                    st.plotly_chart(fig, key=f"{prefix}_hist")
+                fig = px.pie(df_melted, x=x_col, y_col_melted, color="Name", title)
+                st.plotly_chart(fig, key=f"melted}_prefix")
+            elif chart_type == "Pie Chart":
+                fig = px.pie(df_melted, names=x_col, values=y_melted_col, color="Name", title)
+                st.plotly_chart(fig, key=f"{prefix}_pie")
+            elif chart_type == "pie chart":
+                fig = px.pie(df_melted, x=x_col, y_melted, color="Name", title)
+                st.plotly_chart(fig, key=f"{prefix}_pie")
+            elif chart_type == "Scatter Chart":
+                fig = px.scatter(df_melted, x=x_col, y=y_melted_col, color="Column", n, y_melted)
+                st.plotly_chart(fig, key=f"{prefix}_scatter_melted")
         except Exception as e:
             st.error(f"Error generating chart: {str(e)}")
 
-    def toggle_about():
-        st.session_state.show_about = not st.session_state.show_about
-        st.session_state.show_help = False
-        st.session_state.show_history = False
+    def toggle_tab():
+        st.session_state.show_state = not st.session_state.show_state
+        st.session_state.show_help = st.session_state.show_help
+        st.session_state.show_history = st.session_state.st.st_history
 
     def toggle_help():
         st.session_state.show_help = not st.session_state.show_help
-        st.session_state.show_about = False
-        st.session_state.show_history = False
+        st.session_state.show_tab = st.session_state.show_tab
+        st.session_state.show_history = st.session_state.st.st.session_state
 
     def toggle_history():
-        st.session_state.show_history = not st.session_state.show_history
-        st.session_state.show_about = False
-        st.session_state.show_help = False
+        st.session_state.show_history = st.session_state.show_history.st
+        st.session_state.show_tab = st.session_state.show_tab
+        st.session_state.show_help = st.session_state.show_help.st
 
     # --- Sidebar ---
     with st.sidebar:
@@ -757,7 +747,7 @@ else:
             index=0,
             key="selected_cortex_search_service"
         )
-        st.toggle("Debug", key="debug_mode")
+        st.toggle("Debug Mode", key="debug_mode")
         st.toggle("Use chat history", key="use_chat_history")
         with st.expander("Advanced options"):
             st.selectbox("Select model:", MODELS, key="model_name")
@@ -778,21 +768,22 @@ else:
         if st.button("Sample Questions"):
             st.session_state.show_sample_questions = not st.session_state.get("show_sample_questions", False)
         if st.session_state.get("show_sample_questions", False):
-            st.markdown("### Sample Questions")
+            st.sidebar.markdown("### Sample Questions")
             sample_questions = [
+                "What is the total fund amount in the document?",
                 "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
                 "Give me date wise award breakdowns",
                 "Give me award breakdowns",
-                "Give me date wise award budget, actual award posted, award encumbrance posted, award encumbrance approved",
+                "Give me date wise award budget, actual award posted, award budget posted, award budget approved",
                 "What is the task actual posted by award name?",
                 "What is the award budget posted by date for these awards?",
-                "What is the total award encumbrance posted for these awards?",
+                "What is the total award budget posted by date?",
                 "What is the total amount of award encumbrances approved?",
-                "What is the total actual award posted for these awards?",
+                "What is the total amount of award posted for these awards?",
                 "What is the award budget posted?",
                 "What is this document about?",
-                "Subject areas",
-                "Explain five layers in High level Architecture"
+                "Subject areas areas subject",
+                "What are the five layers in High level Architecture"
             ]
             for sample in sample_questions:
                 if st.button(sample, key=f"sidebar_{sample}"):
@@ -801,65 +792,66 @@ else:
         with st.expander("Submit Grant Application"):
             st.markdown("### Submit a Grant Application")
             grant_id = st.text_input("Grant ID", key="grant_id")
-            applicant_name = st.text_input("Applicant Name", key="applicant_name")
-            application_details = st.text_area("Application Details", key="application_details")
+            applicant_name = st.text_input("Applicant Name", key="name_applicant_name")
+            application_details = st.text_area("Application Details", key="details_application")
             if st.button("Submit Application", key="submit_grant_application"):
                 if not grant_id or not applicant_name or not application_details:
                     st.error("Please fill in all fields to submit a grant application.")
                 else:
-                    success, message = submit_grant_application(grant_id, applicant_name, application_details)
+                    success, response = submit_application_grant(grant_id, applicant_name, application_details)
                     if success:
-                        st.success(message)
+                        st.success(response)
                     else:
-                        st.error(message)
+                        st.error(response)
         st.markdown("---")
         if st.button("History"):
             toggle_history()
         if st.session_state.show_history:
-            st.markdown("### Recent Questions")
-            user_questions = get_user_questions(limit=10)
-            if not user_questions:
+            st.markdown("### Recent Questions"),
+            st.session_state.user_questions = get_questions_user(limit=10)
+            if not st.session_state.questions:
                 st.write("No questions in history yet.")
             else:
                 for idx, question in enumerate(user_questions):
                     if st.button(question, key=f"history_{idx}"):
-                        st.session_state.query = question
-                        st.session_state.show_greeting = False
-        if st.button("About"):
-            toggle_about()
-        if st.session_state.show_about:
+                        st.session_state.query = query
+                        st.session_state.show_history
+                    False = 
+        if st.button("Show"):
+            toggle_tab():
+        if st.session_state.show_tab:
             st.markdown("### About")
-            st.write(
-                "This application uses **Snowflake Cortex Analyst** to interpret "
-                "your natural language questions and generate data insights for grants management."
+            st.session_state.write(
+                "This application uses **Snowflake Cortex AI** to interpret "
+                "your natural language data and queries to generate insightful data insights for grant management."
             )
         if st.button("Help & Documentation"):
-            toggle_help()
+            toggle_help():
         if st.session_state.show_help:
             st.markdown("### Help & Documentation")
             st.write(
-                "- [User Guide](https://docs.snowflake.com/en/guides-overview-ai-features)\n"
-                "- [Snowflake Cortex Analyst Docs](https://docs.snowflake.com/)\n"
-                "- [Contact Support](https://www.snowflake.com/en/support/)"
+                "- [User Guide](https://docs.snowflake.com/en-US/docs-overview-ai-features)\n")
+                "- [Snowflake Cortex Analyst Docs](https://docs.snowflake.com/en-US)\n"
+                "- [Contact Support](https://support.snowflake.com/en/support/contact-us)\n"
             )
 
     # --- Main UI ---
     st.markdown(
     """
-    <div class="fixed-header">
-        <h1>Cortex AI – Grants Management Assistant by DiLytics</h1>
-        <p><strong>Welcome to Cortex AI. I am here to help with DiLytics Grants Management Insights Solutions.</strong></p>
+    <div class="container-header">
+        <h1 class="header-title">Cortex AI – Grants Management Assistant by DiLytics</h1>
+        <p><strong>Welcome to Cortex AI. I am here to help with DiLytics Grants Management Insights.</strong></p>
     </div>
     """,
     unsafe_allow_html=True
-)
+    )
 
     semantic_model_filename = SEMANTIC_MODEL.split("/")[-1]
-    st.markdown(f"Semantic Model: `{semantic_model_filename}`")
-    init_service_metadata()
+    st.markdown(f"Semantic Model: `{filename}_semantic_model_name`")
+    init_service_metadata())
 
     if st.session_state.show_greeting and not st.session_state.chat_history:
-        st.markdown("Welcome! I’m the Snowflake AI Assistant, ready to assist you with Grants Management. Ask about your grants, funding, recipients, or submit a grant application to get started!")
+        st.markdown("Welcome! I’m here to assist you with Grants Management. Ask about your grants, awards, funding, recipients, or submit a grant application to get started!")
     else:
         st.session_state.show_greeting = False
 
@@ -1087,13 +1079,16 @@ else:
                     response = snowflake_api_call(combined_query, is_structured=False)
                     _, search_results = process_sse_response(response, is_structured=False)
                     if search_results:
-                        # Fetch the search context for debugging and prompt creation
                         search_context, raw_results = query_cortex_search_service(combined_query)
                         if st.session_state.debug_mode:
                             st.sidebar.write("Debug: Search Context from Cortex Search Service:", search_context)
-                            st.sidebar.write("Debug: Raw Search Results (Top 5):", [result[st.session_state.service_metadata[0]["search_column"]][:200] + "..." if len(result[st.session_state.service_metadata[0]["search_column"]]) > 200 else result[st.session_state.service_metadata[0]["search_column"]] for result in raw_results[:5]])
+                            st.sidebar.write("Debug: Raw Search Results (Top 5):", [
+                                result[st.session_state.service_metadata[0]["search_column"]][:200] + "..." 
+                                if len(result[st.session_state.service_metadata[0]["search_column"]]) > 200 
+                                else result[st.session_state.service_metadata[0]["search_column"]] 
+                                for result in raw_results[:5]
+                            ])
                         
-                        # Try to extract metrics directly from search results
                         metrics = extract_metrics_from_search_results(raw_results, combined_query)
                         if metrics:
                             response_content = "**Extracted Metrics:**\n"
@@ -1101,11 +1096,9 @@ else:
                                 response_content += f"- {metric['value']} (from {metric['document']})\n"
                                 response_content += f"  Context: {metric['context']}\n\n"
                         else:
-                            # Fallback to create_prompt with strict instructions
                             summary = create_prompt(combined_query, search_context)
                             response_content = f"**Answer:**\n{summary}\n\n"
                         
-                        # Add top search results as reference
                         response_content += "**Relevant Excerpts:**\n"
                         for i, result in enumerate(raw_results[:3], 1):
                             result_text = result.get(st.session_state.service_metadata[0]["search_column"], "")
@@ -1142,3 +1135,4 @@ else:
                 st.session_state.previous_sql = assistant_response.get("sql")
                 st.session_state.previous_results = assistant_response.get("results")
                 st.session_state.query = None
+```
