@@ -534,18 +534,18 @@ else:
             else:
                 return [
                     "What is the total award budget posted by date?",
-                    "Which awards have the highest encumbrances in the current quarter?",
-                    "What is the total amount of award encumbrances approved this month?",
+                    "Which awards have the highest encumbrances ?",
+                    "What is the total amount of award encumbrances approved ?",
                     "What is the date-wise breakdown of award budgets?",
-                    "Which awards have pending encumbrances for more than two weeks?"
+                    "Which awards have pending encumbrances ?"
                 ]
         except Exception as e:
             return [
                 "What is the total award budget posted by date?",
-                "Which awards have the highest encumbrances in the current quarter?",
-                "What is the total amount of award encumbrances approved this month?",
+                "Which awards have the highest encumbrances ?",
+                "What is the total amount of award encumbrances approved?",
                 "What is the date-wise breakdown of award budgets?",
-                "Which awards have pending encumbrances for more than two weeks?"
+                "Which awards have pending encumbrances ?"
             ]
 
     def display_chart_tab(df: pd.DataFrame, prefix: str = "chart", query: str = ""):
@@ -656,11 +656,19 @@ else:
         if st.session_state.get("show_sample_questions", False):
             st.markdown("### Sample Questions")
             sample_questions = [
-                "What is the total award budget posted by date?",
-                "Which awards have the highest encumbrances in the current quarter?",
-                "What is the total amount of award encumbrances approved this month?",
-                "What is the date-wise breakdown of award budgets?",
-                "Which awards have pending encumbrances for more than two weeks?"
+                "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
+                "Give me date wise award breakdowns",
+                "Give me award breakdowns",
+                "Give me date wise award budget, actual award posted, award encumbrance posted, award encumbrance approved",
+                "What is the task actual posted by award name?",
+                "What is the award budget posted by date for these awards?",
+                "What is the total award encumbrance posted for these awards?",
+                "What is the total amount of award encumbrances approved?",
+                "What is the total actual award posted for these awards?",
+                "what is the award budget posted?",
+                "what is this document about",
+                "Subject areas",
+                "explain five layers in High level Architecture"
             ]
             for sample in sample_questions:
                 if st.button(sample, key=f"sidebar_{sample}"):
@@ -803,19 +811,19 @@ else:
                         "Hello! How can I assist you with Grants Management today?\n\n"
                         "Here are some questions you can try:\n"
                         "1. What is the total award budget posted by date?\n"
-                        "2. Which awards have the highest encumbrances in the current quarter?\n"
-                        "3. What is the total amount of award encumbrances approved this month?\n"
+                        "2. Which awards have the highest encumbrances approved ?\n"
+                        "3. What is the total amount of award encumbrances ?\n"
                         "4. What is the date-wise breakdown of award budgets?\n"
-                        "5. Which awards have pending encumbrances for more than two weeks?\n"
+                        "5. Which awards have pending encumbrances ?\n"
                     )
                     response_placeholder.markdown(response_content, unsafe_allow_html=True)
                     assistant_response["content"] = response_content
                     suggestions = [
                         "What is the total award budget posted by date?",
-                        "Which awards have the highest encumbrances in the current quarter?",
-                        "What is the total amount of award encumbrances approved this month?",
+                        "Which awards have the highest encumbrances ?",
+                        "What is the total amount of award encumbrances approved ?",
                         "What is the date-wise breakdown of award budgets?",
-                        "Which awards have pending encumbrances for more than two weeks?"
+                        "Which awards have pending encumbrances ?"
                     ]
                     st.session_state.last_suggestions = suggestions
                     st.session_state.messages.append({"role": "assistant", "content": response_content})
@@ -826,10 +834,10 @@ else:
                     )
                     suggestions = [
                         "What is the total award budget posted by date?",
-                        "Which awards have the highest encumbrances in the current quarter?",
-                        "What is the total amount of award encumbrances approved this month?",
+                        "Which awards have the highest encumbrances ?",
+                        "What is the total amount of award encumbrances approved ?",
                         "What is the date-wise breakdown of award budgets?",
-                        "Which awards have pending encumbrances for more than two weeks?"
+                        "Which awards have pending encumbrances ?"
                     ]
                     for i, suggestion in enumerate(suggestions, 1):
                         response_content += f"{i}. {suggestion}\n"
