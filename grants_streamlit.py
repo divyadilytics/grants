@@ -109,6 +109,10 @@ st.markdown("""
     white-space: pre-wrap !important;
     word-wrap: break-word !important;
     overflow: hidden !important;
+    margin-bottom: 20px !important;
+    padding: 10px !important;
+    border-radius: 8px !important;
+    text-align: left !important;
 }
 [data-testid="stChatMessageContent"] {
     white-space: pre-wrap !important;
@@ -117,6 +121,19 @@ st.markdown("""
     width: 100% !important;
     max-width: 100% !important;
     box-sizing: border-box !important;
+    text-align: left !important;
+    padding-left: 0 !important;
+    margin-left: 0 !important;
+}
+[data-testid="stDataFrame"] {
+    text-align: left !important;
+    width: 100% !important;
+    margin: 0 auto !important;
+}
+[data-testid="stMarkdown"] {
+    text-align: left !important;
+    width: 100% !important;
+    padding: 5px 0 !important;
 }
 .copy-button, [data-testid="copy-button"], [title="Copy to clipboard"], [data-testid="stTextArea"] {
     display: none !important;
@@ -362,6 +379,9 @@ else:
                 return None
             columns = df.schema.names
             result_df = pd.DataFrame(data, columns=columns)
+            # Ensure AWARD_NUMBER is treated as an integer without 'k' or decimal formatting
+            if "AWARD_NUMBER" in result_df.columns:
+                result_df["AWARD_NUMBER"] = result_df["AWARD_NUMBER"].astype(int)
             return result_df
         except Exception as e:
             st.error(f"❌ SQL Execution Error: {str(e)}")
@@ -725,10 +745,14 @@ else:
                 with st.expander("View SQL Query", expanded=False):
                     st.code(message["sql"], language="sql")
                 st.markdown(f"**Query Results ({len(message['results'])} rows):**")
-                st.dataframe(message["results"])
-                if not message["results"].empty and len(message["results"].columns) >= 2:
+                # Format AWARD_NUMBER column in the dataframe display
+                df_to_display = message["results"].copy()
+                if "AWARD_NUMBER" in df_to_display.columns:
+                    df_to_display["AWARD_NUMBER"] = df_to_display["AWARD_NUMBER"].astype(int)
+                st.dataframe(df_to_display)
+                if not df_to_display.empty and len(df_to_display.columns) >= 2:
                     st.markdown("**📈 Visualization:**")
-                    display_chart_tab(message["results"], prefix=f"chart_{hash(message['content'])}", query=message.get("query", ""))
+                    display_chart_tab(df_to_display, prefix=f"chart_{hash(message['content'])}", query=message.get("query", ""))
 
     chat_input_query = st.chat_input("Ask your question about grants...")
     if chat_input_query:
@@ -831,10 +855,14 @@ else:
                             with st.expander("View SQL Query", expanded=False):
                                 st.code(sql, language="sql")
                             st.markdown(f"**Query Results ({len(results)} rows):**")
-                            st.dataframe(results)
-                            if len(results.columns) >= 2:
+                            # Format AWARD_NUMBER column in the dataframe display
+                            df_to_display = results.copy()
+                            if "AWARD_NUMBER" in df_to_display.columns:
+                                df_to_display["AWARD_NUMBER"] = df_to_display["AWARD_NUMBER"].astype(int)
+                            st.dataframe(df_to_display)
+                            if len(df_to_display.columns) >= 2:
                                 st.markdown("**📈 Visualization:**")
-                                display_chart_tab(results, prefix=f"chart_{hash(combined_query)}", query=combined_query)
+                                display_chart_tab(df_to_display, prefix=f"chart_{hash(combined_query)}", query=combined_query)
                             assistant_response.update({
                                 "content": response_content,
                                 "sql": sql,
