@@ -17,8 +17,8 @@ DATABASE = "AI"
 SCHEMA = "DWH_MART"
 API_ENDPOINT = "/api/v2/cortex/agent:run"
 API_TIMEOUT = 50000
-CORTEX_SEARCH_SERVICES = "AI.DWH_MART.propertymanagement"
-SEMANTIC_MODEL = '@"AI"."DWH_MART"."PROPERTY_MANAGEMENT"/property_management.yaml'
+CORTEX_SEARCH_SERVICES = "AI.DWH_MART.GRANTS"
+SEMANTIC_MODEL = '@"AI"."DWH_MART"."GRANTS"/grants.yaml'
 
 # --- Model Options ---
 MODELS = [
@@ -30,7 +30,7 @@ MODELS = [
 
 # --- Streamlit Page Config ---
 st.set_page_config(
-    page_title="Cortex AI-Property Management Assistant",
+    page_title="Cortex AI-Grants Assistant",
     layout="wide",
     initial_sidebar_state="auto"
 )
@@ -63,9 +63,9 @@ if "current_sql" not in st.session_state:
 if "current_summary" not in st.session_state:
     st.session_state.current_summary = None
 if "service_metadata" not in st.session_state:
-    st.session_state.service_metadata = [{"name": "AI.DWH_MART.PROPERTYMANAGEMENT", "search_column": ""}]
+    st.session_state.service_metadata = [{"name": "AI.DWH_MART.GRANTS", "search_column": ""}]
 if "selected_cortex_search_service" not in st.session_state:
-    st.session_state.selected_cortex_search_service = "AI.DWH_MART.PROPERTYMANAGEMENT"
+    st.session_state.selected_cortex_search_service = "AI.DWH_MART.GRANTS"
 if "model_name" not in st.session_state:
     st.session_state.model_name = "mistral-large"
 if "num_retrieved_chunks" not in st.session_state:
@@ -185,18 +185,18 @@ def stream_text(text: str, chunk_size: int = 2, delay: float = 0.04):
         yield text[i:i + chunk_size]
         time.sleep(delay)
 
-def submit_maintenance_request(property_id: str, tenant_name: str, issue_description: str):
+def submit_grant_application(grant_id: str, applicant_name: str, application_details: str):
     try:
-        request_id = str(uuid.uuid4())
+        application_id = str(uuid.uuid4())
         insert_query = """
-        INSERT INTO MAINTENANCE_REQUESTS 
-        (REQUEST_ID, PROPERTY_ID, TENANT_NAME, ISSUE_DESCRIPTION, SUBMITTED_AT, STATUS)
+        INSERT INTO GRANT_APPLICATIONS 
+        (APPLICATION_ID, GRANT_ID, APPLICANT_NAME, APPLICATION_DETAILS, SUBMITTED_AT, STATUS)
         VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP(), 'PENDING')
         """
-        session.sql(insert_query).bind((request_id, property_id, tenant_name, issue_description)).collect()
-        return True, f"📝 Maintenance request submitted successfully! Request ID: {request_id}"
+        session.sql(insert_query).bind((application_id, grant_id, applicant_name, application_details)).collect()
+        return True, f"📝 Grant application submitted successfully! Application ID: {application_id}"
     except Exception as e:
-        return False, f"❌ Failed to submit maintenance request: {str(e)}"
+        return False, f"❌ Failed to submit grant application: {str(e)}"
 
 def start_new_conversation():
     st.session_state.chat_history = []
@@ -220,12 +220,12 @@ def start_new_conversation():
 
 def init_service_metadata():
     if not st.session_state.service_metadata:
-        st.session_state.service_metadata = [{"name": "AI.DWH_MART.PROPERTYMANAGEMENT", "search_column": ""}]
+        st.session_state.service_metadata = [{"name": "AI.DWH_MART.GRANTS", "search_column": ""}]
     try:
-        svc_search_col = session.sql("DESC CORTEX SEARCH SERVICE AI.DWH_MART.PROPERTYMANAGEMENT;").collect()[0]["search_column"]
-        st.session_state.service_metadata = [{"name": "AI.DWH_MART.PROPERTYMANAGEMENT", "search_column": svc_search_col}]
+        svc_search_col = session.sql("DESC CORTEX SEARCH SERVICE AI.DWH_MART.GRANTS;").collect()[0]["search_column"]
+        st.session_state.service_metadata = [{"name": "AI.DWH_MART.GRANTS", "search_column": svc_search_col}]
     except Exception as e:
-        st.error(f"❌ Failed to verify AI.DWH_MART.PROPERTYMANAGEMENT: {str(e)}.")
+        st.error(f"❌ Failed to verify AI.DWH_MART.GRANTS: {str(e)}.")
 
 def query_cortex_search_service(query):
     try:
@@ -234,7 +234,7 @@ def query_cortex_search_service(query):
         cortex_search_service = (
             root.databases[db]
             .schemas[schema]
-            .cortex_search_services["AI.DWH_MART.PROPERTYMANAGEMENT"]
+            .cortex_search_services["AI.DWH_MART.GRANTS"]
         )
         context_documents = cortex_search_service.search(
             query, columns=[], limit=st.session_state.num_retrieved_chunks
@@ -261,7 +261,7 @@ def make_chat_history_summary(chat_history, question):
         You are a conversational AI assistant. Based on the chat history below and the current question, generate a single, clear, and concise query that combines the context of the chat history with the current question. The resulting query should be in natural language and should reflect the user's intent in the conversational flow. Ensure the query is standalone and can be understood without needing to refer back to the chat history.
 
         For example:
-        - If the chat history contains "user: Total number of properties currently occupied?" and the current question is "by state", the resulting query should be "What is the total number of properties currently occupied by state?"
+        - If the chat history contains "user: Total number of grants awarded?" and the current question is "by year", the resulting query should be "What is the total number of grants awarded by year?"
 
         Answer with only the query. Do not add any explanation.
 
@@ -277,6 +277,7 @@ def make_chat_history_summary(chat_history, question):
     if st.session_state.debug_mode:
         st.sidebar.text_area("Chat History Summary", summary.replace("$", "\$"), height=150)
     return summary
+
 def create_prompt(user_question):
     chat_history_str = ""
     if st.session_state.use_chat_history:
@@ -296,7 +297,7 @@ def create_prompt(user_question):
     
     prompt = f"""
         [INST]
-        You are a helpful AI chat assistant for property management. Use the provided context and chat history to provide a coherent, concise, and relevant answer to the user's question.
+        You are a helpful AI chat assistant for grants management. Use the provided context and chat history to provide a coherent, concise, and relevant answer to the user's question.
         <chat_history>
         {chat_history_str}
         </chat_history>
@@ -318,7 +319,7 @@ def get_user_questions(limit=10):
 # --- Main Application Logic ---
 if not st.session_state.authenticated:
     st.title("Welcome to Snowflake Cortex AI")
-    st.markdown("Please login to interact with your data")
+    st.markdown("Please login to interact with your grants data")
     st.session_state.username = st.text_input("Enter Snowflake Username:", value=st.session_state.username)
     st.session_state.password = st.text_input("Enter Password:", type="password")
     if st.button("Login"):
@@ -369,7 +370,7 @@ else:
     def is_structured_query(query: str):
         structured_patterns = [
             r'\b(count|number|where|group by|order by|sum|avg|max|min|total|how many|which|show|list)\b',
-            r'\b(property|tenant|lease|rent|occupancy|maintenance|billing|payment)\b'
+            r'\b(grant|award|funding|recipient|application|status|amount)\b'
         ]
         return any(re.search(pattern, query.lower()) for pattern in structured_patterns)
 
@@ -493,7 +494,7 @@ else:
     def suggest_sample_questions(query: str) -> List[str]:
         try:
             prompt = (
-                f"The user asked: '{query}'. Generate 3-5 clear, concise sample questions related to properties, leases, tenants, rent, or occupancy metrics. "
+                f"The user asked: '{query}'. Generate 3-5 clear, concise sample questions related to grants, awards, funding, recipients, or application metrics. "
                 f"Format as a numbered list."
             )
             response = complete(st.session_state.model_name, prompt)
@@ -507,19 +508,19 @@ else:
                 return questions[:5]
             else:
                 return [
-                    "Which properties have the highest occupancy rates?",
-                    "What is the average rent collected per tenant?",
-                    "Which leases expire in the next 30 days?",
-                    "What’s the total rental income by property?",
-                    "Which tenants have pending rent payments?"
+                    "What is the total number of grants awarded?",
+                    "Which organizations received the most funding?",
+                    "What is the average grant amount by category?",
+                    "Which grants are expiring soon?",
+                    "What is the total funding awarded by year?"
                 ]
         except Exception as e:
             return [
-                "Which properties have the highest occupancy rates?",
-                "What is the average rent collected per tenant?",
-                "Which leases expire in the next 30 days?",
-                "What’s the total rental income by property?",
-                "Which tenants have pending rent payments?"
+                "What is the total number of grants awarded?",
+                "Which organizations received the most funding?",
+                "What is the average grant amount by category?",
+                "Which grants are expiring soon?",
+                "What is the total funding awarded by year?"
             ]
 
     def display_chart_tab(df: pd.DataFrame, prefix: str = "chart", query: str = ""):
@@ -528,34 +529,54 @@ else:
                 st.warning("No valid data available for visualization.")
                 return
             query_lower = query.lower()
-            if re.search(r'\b(county|jurisdiction)\b', query_lower):
+            if re.search(r'\b(category|type)\b', query_lower):
                 default_data = "Pie Chart"
-            elif re.search(r'\b(month|year|date)\b', query_lower):
+            elif re.search(r'\b(year|date)\b', query_lower):
                 default_data = "Line Chart"
             else:
                 default_data = "Bar Chart"
             all_cols = list(df.columns)
+            numeric_cols = [col for col in all_cols if pd.api.types.is_numeric_dtype(df[col])]
+            y_options = numeric_cols + ["All Columns"]
             col1, col2, col3 = st.columns(3)
             x_col = col1.selectbox("X axis", all_cols, index=0, key=f"{prefix}_x")
-            remaining_cols = [c for c in all_cols if c != x_col]
+            remaining_cols = [c for c in y_options if c != x_col]
             y_col = col2.selectbox("Y axis", remaining_cols, index=0, key=f"{prefix}_y")
             chart_options = ["Line Chart", "Bar Chart", "Pie Chart", "Scatter Chart", "Histogram Chart"]
             chart_type = col3.selectbox("Chart Type", chart_options, index=chart_options.index(default_data), key=f"{prefix}_type")
-            if chart_type == "Line Chart":
-                fig = px.line(df, x=x_col, y=y_col, title=chart_type)
-                st.plotly_chart(fig, key=f"{prefix}_line")
-            elif chart_type == "Bar Chart":
-                fig = px.bar(df, x=x_col, y=y_col, title=chart_type)
-                st.plotly_chart(fig, key=f"{prefix}_bar")
-            elif chart_type == "Pie Chart":
-                fig = px.pie(df, names=x_col, values=y_col, title=chart_type)
-                st.plotly_chart(fig, key=f"{prefix}_pie")
-            elif chart_type == "Scatter Chart":
-                fig = px.scatter(df, x=x_col, y=y_col, title=chart_type)
-                st.plotly_chart(fig, key=f"{prefix}_scatter")
-            elif chart_type == "Histogram Chart":
-                fig = px.histogram(df, x=x_col, title=chart_type)
-                st.plotly_chart(fig, key=f"{prefix}_hist")
+            if y_col == "All Columns":
+                df_melted = pd.melt(df, id_vars=[x_col], value_vars=numeric_cols, var_name="Variable", value_name="Value")
+                if chart_type == "Line Chart":
+                    fig = px.line(df_melted, x=x_col, y="Value", color="Variable", title=chart_type)
+                    st.plotly_chart(fig, key=f"{prefix}_line")
+                elif chart_type == "Bar Chart":
+                    fig = px.bar(df_melted, x=x_col, y="Value", color="Variable", title=chart_type)
+                    st.plotly_chart(fig, key=f"{prefix}_bar")
+                elif chart_type == "Pie Chart":
+                    fig = px.pie(df_melted, names=x_col, values="Value", title=chart_type)
+                    st.plotly_chart(fig, key=f"{prefix}_pie")
+                elif chart_type == "Scatter Chart":
+                    fig = px.scatter(df_melted, x=x_col, y="Value", color="Variable", title=chart_type)
+                    st.plotly_chart(fig, key=f"{prefix}_scatter")
+                elif chart_type == "Histogram Chart":
+                    fig = px.histogram(df_melted, x=x_col, y="Value", color="Variable", title=chart_type)
+                    st.plotly_chart(fig, key=f"{prefix}_hist")
+            else:
+                if chart_type == "Line Chart":
+                    fig = px.line(df, x=x_col, y=y_col, title=chart_type)
+                    st.plotly_chart(fig, key=f"{prefix}_line")
+                elif chart_type == "Bar Chart":
+                    fig = px.bar(df, x=x_col, y=y_col, title=chart_type)
+                    st.plotly_chart(fig, key=f"{prefix}_bar")
+                elif chart_type == "Pie Chart":
+                    fig = px.pie(df, names=x_col, values=y_col, title=chart_type)
+                    st.plotly_chart(fig, key=f"{prefix}_pie")
+                elif chart_type == "Scatter Chart":
+                    fig = px.scatter(df, x=x_col, y=y_col, title=chart_type)
+                    st.plotly_chart(fig, key=f"{prefix}_scatter")
+                elif chart_type == "Histogram Chart":
+                    fig = px.histogram(df, x=x_col, y=y_col, title=chart_type)
+                    st.plotly_chart(fig, key=f"{prefix}_hist")
         except Exception as e:
             st.error(f"❌ Error generating chart: {str(e)}")
 
@@ -584,7 +605,7 @@ else:
         st.selectbox(
             "Select Cortex Search Service:",
             [CORTEX_SEARCH_SERVICES],
-            index=0,  # Default to AI.DWH_MART.PROPERTYMANAGEMENT
+            index=0,
             key="selected_cortex_search_service"
         )
         st.toggle("Debug", key="debug_mode")
@@ -610,29 +631,29 @@ else:
         if st.session_state.get("show_sample_questions", False):
             st.markdown("### Sample Questions")
             sample_questions = [
-                "What is Property Management?",
-                "Total number of properties currently occupied?",
-                "What is the number of properties by occupancy status?",
-                "What is the number of properties currently leased?",
-                "What is the average rent collected per tenant?",
-                "Which leases expire in the next 30 days?",
-                "What’s the total rental income by property?",
-                "Which tenants have pending rent payments?"
+                "What is Grants Management?",
+                "Total number of grants awarded?",
+                "What is the number of grants by funding status?",
+                "What is the total funding awarded by year?",
+                "What is the average grant amount by category?",
+                "Which grants are expiring soon?",
+                "Which organizations have received the most funding?",
+                "Which grant applications are pending?"
             ]
             for sample in sample_questions:
                 if st.button(sample, key=f"sidebar_{sample}"):
                     st.session_state.query = sample
                     st.session_state.show_greeting = False
-        with st.expander("Submit Maintenance Request"):
-            st.markdown("### Submit a Maintenance Request")
-            property_id = st.text_input("Property ID", key="maint_property_id")
-            tenant_name = st.text_input("Tenant Name", key="maint_tenant_name")
-            issue_description = st.text_area("Issue Description", key="maint_issue_description")
-            if st.button("Submit Request", key="submit_maintenance_request"):
-                if not property_id or not tenant_name or not issue_description:
-                    st.error("❌ Please fill in all fields to submit a maintenance request.")
+        with st.expander("Submit Grant Application"):
+            st.markdown("### Submit a Grant Application")
+            grant_id = st.text_input("Grant ID", key="grant_id")
+            applicant_name = st.text_input("Applicant Name", key="applicant_name")
+            application_details = st.text_area("Application Details", key="application_details")
+            if st.button("Submit Application", key="submit_grant_application"):
+                if not grant_id or not applicant_name or not application_details:
+                    st.error("❌ Please fill in all fields to submit a grant application.")
                 else:
-                    success, message = submit_maintenance_request(property_id, tenant_name, issue_description)
+                    success, message = submit_grant_application(grant_id, applicant_name, application_details)
                     if success:
                         st.success(message)
                     else:
@@ -656,7 +677,7 @@ else:
             st.markdown("### About")
             st.write(
                 "This application uses **Snowflake Cortex Analyst** to interpret "
-                "your natural language questions and generate data insights for property management."
+                "your natural language questions and generate data insights for grants management."
             )
         if st.button("Help & Documentation"):
             toggle_help()
@@ -673,10 +694,10 @@ else:
     """
     <div class="fixed-header">
         <h1 style='font-size: 30px; color: #29B5E8; margin-bottom: 4px;'>
-            Cortex AI – Property Management Assistant by DiLytics
+            Cortex AI – Grants Management Assistant by DiLytics
         </h1>
         <p style='font-size: 18px; color: #333;'>
-            <strong>Welcome to Cortex AI. I am here to help with DiLytics Property Management Insights Solutions.</strong>
+            <strong>Welcome to Cortex AI. I am here to help with DiLytics Grants Management Insights Solutions.</strong>
         </p>
     </div>
     """,
@@ -688,7 +709,7 @@ else:
     init_service_metadata()
 
     if st.session_state.show_greeting and not st.session_state.chat_history:
-        st.markdown("Welcome! I’m the Snowflake AI Assistant, ready to assist you with Property Management. Ask about your rent, lease, occupancy, or submit a maintenance request to get started!")
+        st.markdown("Welcome! I’m the Snowflake AI Assistant, ready to assist you with Grants Management. Ask about your grants, funding, recipients, or submit a grant application to get started!")
     else:
         st.session_state.show_greeting = False
 
@@ -704,7 +725,7 @@ else:
                     st.markdown("**📈 Visualization:**")
                     display_chart_tab(message["results"], prefix=f"chart_{hash(message['content'])}", query=message.get("query", ""))
 
-    chat_input_query = st.chat_input("Ask your question...")
+    chat_input_query = st.chat_input("Ask your question about grants...")
     if chat_input_query:
         st.session_state.query = chat_input_query
 
@@ -738,136 +759,4 @@ else:
             st.markdown(original_query)
         with st.chat_message("assistant"):
             with st.spinner("Generating Response..."):
-                response_placeholder = st.empty()
-                if st.session_state.data_source not in ["Database", "Document"]:
-                    st.session_state.data_source = "Database"
-                is_structured = is_structured_query(combined_query) and st.session_state.data_source == "Database"
-                is_complete = is_complete_query(combined_query)
-                is_summarize = is_summarize_query(combined_query)
-                is_suggestion = is_question_suggestion_query(combined_query)
-                is_greeting = is_greeting_query(combined_query)
-                assistant_response = {"role": "assistant", "content": "", "query": combined_query}
-                response_content = ""
-                failed_response = False
-
-                if is_greeting or is_suggestion:
-                    response_content = (
-                        "Hello! Welcome to the Property Management AI Assistant!\n"
-                        "Here are some questions you can try:\n"
-                    )
-                    suggestions = [
-                        "Total number of properties currently occupied?",
-                        "What is the average rent collected per tenant?",
-                        "Which leases expire in the next 30 days?",
-                        "What’s the total rental income by property?"
-                    ]
-                    for i, suggestion in enumerate(suggestions, 1):
-                        response_content += f"{i}. {suggestion}\n"
-                    with response_placeholder:
-                        st.markdown(response_content, unsafe_allow_html=True)
-                    assistant_response["content"] = response_content
-                    st.session_state.last_suggestions = suggestions
-                    st.session_state.messages.append({"role": "assistant", "content": response_content})
-
-                elif is_complete:
-                    response = create_prompt(combined_query)
-                    if response:
-                        response_content = f"**✍️ Generated Response:**\n{response}"
-                        with response_placeholder:
-                            st.markdown(response_content, unsafe_allow_html=True)
-                        assistant_response["content"] = response_content
-                        st.session_state.messages.append({"role": "assistant", "content": response_content})
-                    else:
-                        failed_response = True
-
-                elif is_summarize:
-                    summary = summarize(combined_query)
-                    if summary:
-                        response_content = f"**Summary:**\n{summary}"
-                        with response_placeholder:
-                            st.markdown(response_content, unsafe_allow_html=True)
-                        assistant_response["content"] = response_content
-                        st.session_state.messages.append({"role": "assistant", "content": response_content})
-                    else:
-                        failed_response = True
-
-                elif is_structured:
-                    response = snowflake_api_call(combined_query, is_structured=True)
-                    sql, _ = process_sse_response(response, is_structured=True)
-                    if sql:
-                        results = run_snowflake_query(sql)
-                        if results is not None and not results.empty:
-                            results_text = results.to_string(index=False)
-                            prompt = f"Provide a concise natural language answer to the query '{combined_query}' using the following data:\n\n{results_text}"
-                            summary = complete(st.session_state.model_name, prompt)
-                            if not summary:
-                                summary = "Unable to generate a summary."
-                            response_content = f"**✍️ Generated Response:**\n{summary}"
-                            with response_placeholder:
-                                st.markdown(response_content, unsafe_allow_html=True)
-                            with st.expander("View SQL Query", expanded=False):
-                                st.code(sql, language="sql")
-                            st.markdown(f"**Query Results ({len(results)} rows):**")
-                            st.dataframe(results)
-                            if len(results.columns) >= 2:
-                                st.markdown("**📈 Visualization:**")
-                                display_chart_tab(results, prefix=f"chart_{hash(combined_query)}", query=combined_query)
-                            assistant_response.update({
-                                "content": response_content,
-                                "sql": sql,
-                                "results": results,
-                                "summary": summary
-                            })
-                            st.session_state.messages.append({
-                                "role": "assistant",
-                                "content": response_content,
-                                "sql": sql,
-                                "results": results,
-                                "summary": summary
-                            })
-                        else:
-                            response_content = "No data returned for the query."
-                            failed_response = True
-                            assistant_response["content"] = response_content
-                    else:
-                        response_content = "Failed to generate SQL query."
-                        failed_response = True
-                        assistant_response["content"] = response_content
-
-                elif st.session_state.data_source == "Document":
-                    response = snowflake_api_call(combined_query, is_structured=False)
-                    _, search_results = process_sse_response(response, is_structured=False)
-                    if search_results:
-                        raw_result = search_results[0]
-                        summary = create_prompt(combined_query)
-                        if summary:
-                            response_content = f"**Here is the Answer:**\n{summary}"
-                        else:
-                            response_content = f"**🔍 Key Information:**\n{summarize_unstructured_answer(raw_result)}"
-                        with response_placeholder:
-                            st.markdown(response_content, unsafe_allow_html=True)
-                        assistant_response["content"] = response_content
-                        st.session_state.messages.append({"role": "assistant", "content": response_content})
-                    else:
-                        failed_response = True
-
-                if failed_response:
-                    suggestions = suggest_sample_questions(combined_query)
-                    response_content = "I am not sure about your question. Here are some questions you can ask me:\n\n"
-                    for i, suggestion in enumerate(suggestions, 1):
-                        response_content += f"{i}. {suggestion}\n"
-                    with response_placeholder:
-                        st.markdown(response_content, unsafe_allow_html=True)
-                    assistant_response["content"] = response_content
-                    st.session_state.last_suggestions = suggestions
-                    st.session_state.messages.append({"role": "assistant", "content": response_content})
-
-                st.session_state.chat_history.append(assistant_response)
-                st.session_state.current_query = combined_query
-                st.session_state.current_results = assistant_response.get("results")
-                st.session_state.current_sql = assistant_response.get("sql")
-                st.session_state.current_summary = assistant_response.get("summary")
-                st.session_state.previous_query = combined_query
-                st.session_state.previous_sql = assistant_response.get("sql")
-                st.session_state.previous_results = assistant_response.get("results")
-                st.session_state.query = None
+                response_placeholder = st.empty
