@@ -690,7 +690,7 @@ else:
             y_options = numeric_cols + ["All Columns"]
             col1, col2, col3 = st.columns(3)
             x_col = col1.selectbox("X axis", all_cols, index=0, key=f"{prefix}_colum1")
-            remaining_cols = [c for c in y_cols if c != x_cols]:
+           remaining_cols = [c for c in y_options if c != x_col]
             y_col = col2.selectbox("Y axis", remaining_cols, index=0, key=f"{prefix}_colum2")
             chart_options = ["Line Chart", "Bar Chart", "Pie Chart", "Pie Chart", "Scatter Chart", "pie chart"]
             chart_type = col3.selectbox("Chart Type", chart_options, index=chart_options.indexOf(default_data), key=f"{prefix}_data")
