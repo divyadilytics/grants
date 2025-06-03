@@ -243,7 +243,7 @@ def create_prompt(user_question):
         return complete(st.session_state.model_name, user_question)
     
     if is_specific_unstructured:
-    query_lower = user_question.lower()
+        query_lower = user_question.lower()
 
         if "metric" in query_lower:
             fy_match = re.search(r'fy\s?(\d{2}-\d{2})', query_lower)
