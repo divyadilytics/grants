@@ -12,12 +12,12 @@ import time
 import uuid
 
 # --- Snowflake/Cortex Configuration ---
-HOST = "HLGSIYM-COB42429.snowflakecomputing.com"
+HOST = "itvdwya-azb15149.snowflakecomputing.com"
 DATABASE = "AI"
 SCHEMA = "DWH_MART"
 API_ENDPOINT = "/api/v2/cortex/agent:run"
 API_TIMEOUT = 50000
-CORTEX_SEARCH_SERVICES = "AI.DWH_MART.Grants_search_services"
+CORTEX_SEARCH_SERVICES = "AI.DWH_MART.GRANTS_SEARCH_SERVICES"
 SEMANTIC_MODEL = '@"AI"."DWH_MART"."GRANTS"/grantsyaml_27.yaml'
 
 # --- Model Options ---
@@ -327,7 +327,7 @@ if not st.session_state.authenticated:
             conn = snowflake.connector.connect(
                 user="CORTEX",
                 password="Dilytics@12345",
-                account="HLGSIYM-COB42429",
+                account="itvdwya-azb15149",
                 host=HOST,
                 port=443,
                 warehouse="COMPUTE_WH",
