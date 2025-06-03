@@ -91,12 +91,24 @@ st.markdown("""
 [data-testid="stChatMessage"] {
     opacity: 1 !important;
     background-color: transparent !important;
+    font-family: Arial, sans-serif !important;
+    font-size: 16px !important;
+    line-height: 1.5 !important;
 }
 [data-testid="stChatMessageContent"] {
     white-space: normal !important; /* Ensure text wraps */
     overflow-wrap: break-word !important; /* Wrap long words */
     word-break: break-word !important; /* Break words if necessary */
     max-width: 100% !important; /* Ensure content doesn't overflow */
+    font-family: Arial, sans-serif !important;
+    font-size: 16px !important;
+    line-height: 1.5 !important;
+}
+/* Apply Arial to all text elements for consistency */
+body, p, div, span, h1, h2, h3, h4, h5, h6, li, a, input, button, select, option, textarea {
+    font-family: Arial, sans-serif !important;
+    font-size: 16px !important;
+    line-height: 1.5 !important;
 }
 /* Style for the logo container */
 .logo-container {
@@ -288,7 +300,7 @@ def create_prompt(user_question):
         elif "join" in query_lower or "filter" in query_lower:
             prompt_instruction = (
                 f"Provide a detailed and concise explanation for the query '{user_question}' in the context of the Planning and Budgeting system. "
-                f"Explain the join conditions (e.g., tables like POSITION_FACT or LINE_ITEM_FACT joined with dimensions like ORGANIZATION, FUND, or PROGRAM) "
+                f"Explain the join conditions (e.g., tables like POSITION_FACT or LINE_ITEM_FACT joined with dimensions like ORGANIZATION, FUN , or PROGRAM) "
                 f"and filter conditions (e.g., specific versions like COUNCIL1, scenarios like FORECASTING, or fiscal years) used in the data model. "
                 f"Describe their purpose and impact on query results in budgeting or planning. "
                 f"Ensure the response is clear, specific, avoids document references, and directly addresses the query."
