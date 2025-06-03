@@ -44,7 +44,6 @@ if "authenticated" not in st.session_state:
     st.session_state.snowpark_session = None
     st.session_state.chat_history = []
     st.session_state.messages = []
-    st.session_state.message_counter = 0  # Add counter for unique message IDs
 if "debug_mode" not in st.session_state:
     st.session_state.debug_mode = False
 if "last_suggestions" not in st.session_state:
@@ -430,6 +429,12 @@ if not st.session_state.authenticated:
         except Exception as e:
             st.error(f"Authentication failed: {e}")
 else:
+    # Initialize message_counter after authentication
+    if "message_counter" not in st.session_state:
+        st.session_state.message_counter = 0
+        if st.session_state.debug_mode:
+            st.sidebar.write("Debug: Initialized message_counter to 0")
+
     session = st.session_state.snowpark_session
     root = Root(session)
 
@@ -841,9 +846,15 @@ else:
 
     chat_input_query = st.chat_input("Ask your question about grants...")
     if chat_input_query:
-        st.session_state.query = chat_input_query
+        if not st.session_state.authenticated:
+            st.warning("Please log in to submit a query.")
+        else:
+            st.session_state.query = chat_input_query
 
-    if st.session_state.query:
+    if st.session_state.query and st.session_state.authenticated:
+        if st.session_state.debug_mode:
+            st.sidebar.write(f"Debug: Processing query '{st.session_state.query}'")
+            st.sidebar.write(f"Debug: Current message_counter = {st.session_state.message_counter}")
         query = st.session_state.query
         if query.lower().startswith("no of"):
             query = query.replace("no of", "number of", 1)
@@ -867,8 +878,15 @@ else:
             chat_history = get_chat_history()
             if chat_history:
                 combined_query = make_chat_history_summary(chat_history, query)
+        # Safeguard: Ensure message_counter is initialized
+        if "message_counter" not in st.session_state:
+            st.session_state.message_counter = 0
+            if st.session_state.debug_mode:
+                st.sidebar.write("Debug: Re-initialized message_counter to 0 before incrementing")
         # Increment message counter and assign unique message_id
         st.session_state.message_counter += 1
+        if st.session_state.debug_mode:
+            st.sidebar.write(f"Debug: Incremented message_counter to {st.session_state.message_counter}")
         user_message = {
             "role": "user",
             "content": original_query,
@@ -889,7 +907,13 @@ else:
                 is_suggestion = is_question_suggestion_query(combined_query)
                 is_greeting = is_greeting_query(combined_query)
                 # Increment message counter for assistant response
+                if "message_counter" not in st.session_state:
+                    st.session_state.message_counter = 0
+                    if st.session_state.debug_mode:
+                        st.sidebar.write("Debug: Re-initialized message_counter to 0 before assistant increment")
                 st.session_state.message_counter += 1
+                if st.session_state.debug_mode:
+                    st.sidebar.write(f"Debug: Incremented message_counter to {st.session_state.message_counter} for assistant")
                 assistant_response = {
                     "role": "assistant",
                     "content": "",
