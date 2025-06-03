@@ -799,9 +799,25 @@ else:
                 failed_response = False
 
                 if is_greeting:
-                    response_content = "Hello! How can I assist you with Grants Management today?"
+                    response_content = (
+                        "Hello! How can I assist you with Grants Management today?\n\n"
+                        "Here are some questions you can try:\n"
+                        "1. What is the total award budget posted by date?\n"
+                        "2. Which awards have the highest encumbrances in the current quarter?\n"
+                        "3. What is the total amount of award encumbrances approved this month?\n"
+                        "4. What is the date-wise breakdown of award budgets?\n"
+                        "5. Which awards have pending encumbrances for more than two weeks?"
+                    )
                     response_placeholder.markdown(response_content, unsafe_allow_html=True)
                     assistant_response["content"] = response_content
+                    suggestions = [
+                        "What is the total award budget posted by date?",
+                        "Which awards have the highest encumbrances in the current quarter?",
+                        "What is the total amount of award encumbrances approved this month?",
+                        "What is the date-wise breakdown of award budgets?",
+                        "Which awards have pending encumbrances for more than two weeks?"
+                    ]
+                    st.session_state.last_suggestions = suggestions
                     st.session_state.messages.append({"role": "assistant", "content": response_content})
 
                 elif is_suggestion:
