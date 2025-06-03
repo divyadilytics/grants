@@ -648,15 +648,7 @@ else:
     st.markdown(f"Semantic Model: `{semantic_model_filename}`")
     init_service_metadata()
 
-    # Display welcome message only once, outside of chat history loop
-    if not st.session_state.welcome_displayed:
-        welcome_message = "Hi, I am your GRANTS Assistant. I can help you explore data, insights and analytics on GRANTS ."
-        with st.chat_message("assistant"):
-            st.markdown(welcome_message, unsafe_allow_html=True)
-        # Add to chat_history only if not already present
-        if not any(msg["content"] == welcome_message for msg in st.session_state.chat_history):
-            st.session_state.chat_history.append({"role": "assistant", "content": welcome_message})
-        st.session_state.welcome_displayed = True
+   
 
     st.sidebar.subheader("Sample Questions")
     sample_questions = [
