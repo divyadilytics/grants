@@ -130,13 +130,13 @@ def start_new_conversation():
 
 # Initialize service metadata
 def init_service_metadata():
-    st.session_state.service_metadata = [{"name": "GRANTS_SEARCH_SERVICE", "search_column": ""}]
-    st.session_state.selected_cortex_search_service = "GRANTS_SEARCH_SERVICE"
+    st.session_state.service_metadata = [{"name": "GRANTS_SEARCH_SERVICES", "search_column": ""}]
+    st.session_state.selected_cortex_search_service = "GRANTS_SEARCH_SERVICES"
     try:
-        svc_search_col = session.sql("DESC CORTEX SEARCH SERVICE GRANTS_SEARCH_SERVICE;").collect()[0]["search_column"]
-        st.session_state.service_metadata = [{"name": "GRANTS_SEARCH_SERVICE", "search_column": svc_search_col}]
+        svc_search_col = session.sql("DESC CORTEX SEARCH SERVICE GRANTS_SEARCH_SERVICES;").collect()[0]["search_column"]
+        st.session_state.service_metadata = [{"name": "GRANTS_SEARCH_SERVICES", "search_column": svc_search_col}]
     except Exception as e:
-        st.error(f"❌ Failed to verify GRANTS_SEARCH_SERVICE: {str(e)}. Using default configuration.")
+        st.error(f"❌ Failed to verify GRANTS_SEARCH_SERVICES: {str(e)}. Using default configuration.")
 
 # Initialize config options
 def init_config_options():
