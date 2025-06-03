@@ -388,21 +388,27 @@ def create_prompt(user_question):
     if not prompt_context.strip():
         return complete(st.session_state.model_name, user_question)
     
-    prompt = f"""
-        [INST]
-        You are a helpful AI chat assistant for grants management. Use the provided context and chat history to provide a coherent, concise, and relevant answer to the user's question.
-        <chat_history>
-        {chat_history_str}
-        </chat_history>
-        <context>
-        {prompt_context}
-        </context>
-        <question>
-        {user_question}
-        </question>
-        [/INST]
-        Answer:
-    """
+  prompt = f"""
+[INST]
+You are a helpful AI assistant for grants management. You must answer **only using** the context provided below. 
+
+If the context is not sufficient, respond with:
+"I couldn't find relevant information in the documents provided."
+
+<chat_history>
+{chat_history_str}
+</chat_history>
+<context>
+{prompt_context}
+</context>
+<question>
+{user_question}
+</question>
+[/INST]
+Answer:
+"""
+
+
     return complete(st.session_state.model_name, prompt)
 
 def get_user_questions(limit=10):
@@ -1051,19 +1057,38 @@ else:
                         failed_response = True
                         assistant_response["content"] = response_content
 
-                elif st.session_state.data_source == "Document":
-                    response = snowflake_api_call(combined_query, is_structured=False)
-                    _, search_results = process_sse_response(response, is_structured=False)
-                    if search_results:
-                        raw_result = search_results[0]
-                        summary = create_prompt(combined_query)
-                        if summary:
-                            response_content = f"**Answer:**\n{summary}"
-                        else:
-                            response_content = f"**Key Information:**\n{summarize_unstructured_answer(raw_result)}"
-                        response_placeholder.markdown(response_content, unsafe_allow_html=True)
-                        assistant_response["content"] = response_content
-                        st.session_state.messages.append({"role": "assistant", "content": response_content})
+              elif st.session_state.data_source == "Document":
+    response = snowflake_api_call(combined_query, is_structured=False)
+    _, search_results = process_sse_response(response, is_structured=False)
+
+    if search_results:
+        prompt_context = "\n".join(search_results)
+        summary = complete(st.session_state.model_name, f"""
+[INST]
+You are a helpful assistant. Answer the question below using **only** the document context provided.
+
+If the context does not contain the answer, reply:
+"I couldn't find relevant information in the documents provided."
+
+<context>
+{prompt_context}
+</context>
+<question>
+{combined_query}
+</question>
+[/INST]
+Answer:
+""")
+        response_content = f"**Answer:**\n{summary}"
+        response_placeholder.markdown(response_content, unsafe_allow_html=True)
+        assistant_response["content"] = response_content
+        st.session_state.messages.append({"role": "assistant", "content": response_content})
+    else:
+        response_content = "I couldn't find relevant information in the documents provided."
+        response_placeholder.markdown(response_content, unsafe_allow_html=True)
+        assistant_response["content"] = response_content
+        st.session_state.messages.append({"role": "assistant", "content": response_content})
+
                     else:
                         failed_response = True
 
