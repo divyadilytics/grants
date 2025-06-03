@@ -63,9 +63,9 @@ if "current_sql" not in st.session_state:
 if "current_summary" not in st.session_state:
     st.session_state.current_summary = None
 if "service_metadata" not in st.session_state:
-    st.session_state.service_metadata = [{"name": "AI.DWH_MART.GRANTS", "search_column": ""}]
+    st.session_state.service_metadata = [{"name": "AI.DWH_MART.GRANTS_SEARCH_SERVICES", "search_column": ""}]
 if "selected_cortex_search_service" not in st.session_state:
-    st.session_state.selected_cortex_search_service = "AI.DWH_MART.GRANTS"
+    st.session_state.selected_cortex_search_service = "AI.DWH_MART.GRANTS_SEARCH_SERVICES"
 if "model_name" not in st.session_state:
     st.session_state.model_name = "mistral-large"
 if "num_retrieved_chunks" not in st.session_state:
@@ -220,12 +220,12 @@ def start_new_conversation():
 
 def init_service_metadata():
     if not st.session_state.service_metadata:
-        st.session_state.service_metadata = [{"name": "AI.DWH_MART.GRANTS", "search_column": ""}]
+        st.session_state.service_metadata = [{"name": "AI.DWH_MART.GRANTS_SEARCH_SERVICES", "search_column": ""}]
     try:
-        svc_search_col = session.sql("DESC CORTEX SEARCH SERVICE AI.DWH_MART.GRANTS;").collect()[0]["search_column"]
-        st.session_state.service_metadata = [{"name": "AI.DWH_MART.GRANTS", "search_column": svc_search_col}]
+        svc_search_col = session.sql("DESC CORTEX SEARCH SERVICE AI.DWH_MART.GRANTS_SEARCH_SERVICES;").collect()[0]["search_column"]
+        st.session_state.service_metadata = [{"name": "AI.DWH_MART.GRANTS_SEARCH_SERVICES", "search_column": svc_search_col}]
     except Exception as e:
-        st.error(f"❌ Failed to verify AI.DWH_MART.GRANTS: {str(e)}.")
+        st.error(f"❌ Failed to verify AI.DWH_MART.GRANTS_SEARCH_SERVICES: {str(e)}.")
 
 def query_cortex_search_service(query):
     try:
@@ -234,7 +234,7 @@ def query_cortex_search_service(query):
         cortex_search_service = (
             root.databases[db]
             .schemas[schema]
-            .cortex_search_services["AI.DWH_MART.GRANTS"]
+            .cortex_search_services["AI.DWH_MART.GRANTS_SEARCH_SERVICES"]
         )
         context_documents = cortex_search_service.search(
             query, columns=[], limit=st.session_state.num_retrieved_chunks
@@ -604,7 +604,7 @@ else:
         st.radio("Select Data Source:", ["Database", "Document"], key="data_source")
         st.selectbox(
             "Select Cortex Search Service:",
-            [CORTEX_SEARCH_SERVICES],
+            ["AI.DWH_MART.GRANTS_SEARCH_SERVICES"],
             index=0,
             key="selected_cortex_search_service"
         )
@@ -760,3 +760,136 @@ else:
         with st.chat_message("assistant"):
             with st.spinner("Generating Response..."):
                 response_placeholder = st.empty
+                if st.session_state.data_source not in ["Database", "Document"]:
+                    st.session_state.data_source = "Database"
+                is_structured = is_structured_query(combined_query) and st.session_state.data_source == "Database"
+                is_complete = is_complete_query(combined_query)
+                is_summarize = is_summarize_query(combined_query)
+                is_suggestion = is_question_suggestion_query(combined_query)
+                is_greeting = is_greeting_query(combined_query)
+                assistant_response = {"role": "assistant", "content": "", "query": combined_query}
+                response_content = ""
+                failed_response = False
+
+                if is_greeting or is_suggestion:
+                    response_content = (
+                        "Hello! Welcome to the Grants Management AI Assistant!\n"
+                        "Here are some questions you can try:\n"
+                    )
+                    suggestions = [
+                        "What is the total number of grants awarded?",
+                        "Which organizations received the most funding?",
+                        "What is the average grant amount by category?",
+                        "Which grants are expiring soon?",
+                        "What is the total funding awarded by year?"
+                    ]
+                    for i, suggestion in enumerate(suggestions, 1):
+                        response_content += f"{i}. {suggestion}\n"
+                    with response_placeholder:
+                        st.markdown(response_content, unsafe_allow_html=True)
+                    assistant_response["content"] = response_content
+                    st.session_state.last_suggestions = suggestions
+                    st.session_state.messages.append({"role": "assistant", "content": response_content})
+
+                elif is_complete:
+                    response = create_prompt(combined_query)
+                    if response:
+                        response_content = f"**✍️ Generated Response:**\n{response}"
+                        with response_placeholder:
+                            st.markdown(response_content, unsafe_allow_html=True)
+                        assistant_response["content"] = response_content
+                        st.session_state.messages.append({"role": "assistant", "content": response_content})
+                    else:
+                        failed_response = True
+
+                elif is_summarize:
+                    summary = summarize(combined_query)
+                    if summary:
+                        response_content = f"**Summary:**\n{summary}"
+                        with response_placeholder:
+                            st.markdown(response_content, unsafe_allow_html=True)
+                        assistant_response["content"] = response_content
+                        st.session_state.messages.append({"role": "assistant", "content": response_content})
+                    else:
+                        failed_response = True
+
+                elif is_structured:
+                    response = snowflake_api_call(combined_query, is_structured=True)
+                    sql, _ = process_sse_response(response, is_structured=True)
+                    if sql:
+                        results = run_snowflake_query(sql)
+                        if results is not None and not results.empty:
+                            results_text = results.to_string(index=False)
+                            prompt = f"Provide a concise natural language answer to the query '{combined_query}' using the following data:\n\n{results_text}"
+                            summary = complete(st.session_state.model_name, prompt)
+                            if not summary:
+                                summary = "Unable to generate a summary."
+                            response_content = f"**✍️ Generated Response:**\n{summary}"
+                            with response_placeholder:
+                                st.markdown(response_content, unsafe_allow_html=True)
+                            with st.expander("View SQL Query", expanded=False):
+                                st.code(sql, language="sql")
+                            st.markdown(f"**Query Results ({len(results)} rows):**")
+                            st.dataframe(results)
+                            if len(results.columns) >= 2:
+                                st.markdown("**📈 Visualization:**")
+                                display_chart_tab(results, prefix=f"chart_{hash(combined_query)}", query=combined_query)
+                            assistant_response.update({
+                                "content": response_content,
+                                "sql": sql,
+                                "results": results,
+                                "summary": summary
+                            })
+                            st.session_state.messages.append({
+                                "role": "assistant",
+                                "content": response_content,
+                                "sql": sql,
+                                "results": results,
+                                "summary": summary
+                            })
+                        else:
+                            response_content = "No data returned for the query."
+                            failed_response = True
+                            assistant_response["content"] = response_content
+                    else:
+                        response_content = "Failed to generate SQL query."
+                        failed_response = True
+                        assistant_response["content"] = response_content
+
+                elif st.session_state.data_source == "Document":
+                    response = snowflake_api_call(combined_query, is_structured=False)
+                    _, search_results = process_sse_response(response, is_structured=False)
+                    if search_results:
+                        raw_result = search_results[0]
+                        summary = create_prompt(combined_query)
+                        if summary:
+                            response_content = f"**Here is the Answer:**\n{summary}"
+                        else:
+                            response_content = f"**🔍 Key Information:**\n{summarize_unstructured_answer(raw_result)}"
+                        with response_placeholder:
+                            st.markdown(response_content, unsafe_allow_html=True)
+                        assistant_response["content"] = response_content
+                        st.session_state.messages.append({"role": "assistant", "content": response_content})
+                    else:
+                        failed_response = True
+
+                if failed_response:
+                    suggestions = suggest_sample_questions(combined_query)
+                    response_content = "I am not sure about your question. Here are some questions you can ask me:\n\n"
+                    for i, suggestion in enumerate(suggestions, 1):
+                        response_content += f"{i}. {suggestion}\n"
+                    with response_placeholder:
+                        st.markdown(response_content, unsafe_allow_html=True)
+                    assistant_response["content"] = response_content
+                    st.session_state.last_suggestions = suggestions
+                    st.session_state.messages.append({"role": "assistant", "content": response_content})
+
+                st.session_state.chat_history.append(assistant_response)
+                st.session_state.current_query = combined_query
+                st.session_state.current_results = assistant_response.get("results")
+                st.session_state.current_sql = assistant_response.get("sql")
+                st.session_state.current_summary = assistant_response.get("summary")
+                st.session_state.previous_query = combined_query
+                st.session_state.previous_sql = assistant_response.get("sql")
+                st.session_state.previous_results = assistant_response.get("results")
+                st.session_state.query = None
