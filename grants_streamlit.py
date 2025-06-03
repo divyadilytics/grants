@@ -102,42 +102,53 @@ if "show_sample_questions" not in st.session_state:
 # --- CSS Styling ---
 st.markdown("""
 <style>
-#MainMenu, header, footer {visibility: hidden;}
-[data-testid="stChatMessage"] {
-    opacity: 1 !important;
-    background-color: transparent !important;
-    white-space: pre-wrap !important;
-    word-wrap: break-word !important;
-    overflow: hidden !important;
-    margin-bottom: 20px !important;
-    padding: 10px !important;
-    border-radius: 8px !important;
-    text-align: left !important;
+* {
+    box-sizing: border-box;
+    font-family: 'Roboto', 'Arial', sans-serif !important;
 }
-[data-testid="stChatMessageContent"] {
-    white-space: pre-wrap !important;
-    word-wrap: break-word !important;
-    overflow: hidden !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    box-sizing: border-box !important;
-    text-align: left !important;
-    padding-left: 0 !important;
-    margin-left: 0 !important;
+
+/* Hide Streamlit's default elements */
+#MainMenu, header, footer {
+    visibility: hidden;
 }
-[data-testid="stDataFrame"] {
-    text-align: left !important;
-    width: 100% !important;
-    margin: 0 auto !important;
+
+/* Global app container */
+.stApp {
+    padding-top: 80px !important; /* Reduced from 100px to minimize top spacing */
 }
-[data-testid="stMarkdown"] {
-    text-align: left !important;
-    width: 100% !important;
-    padding: 5px 0 !important;
+
+/* Fixed header styling */
+.fixed-header {
+    position: fixed;
+    top: 0;
+    left: 20px;
+    right: 20px;
+    z-index: 999;
+    background-color: #ffffff;
+    padding: 8px 10px; /* Reduced padding for tighter spacing */
+    text-align: center;
+    pointer-events: none;
 }
-.copy-button, [data-testid="copy-button"], [title="Copy to clipboard"], [data-testid="stTextArea"] {
-    display: none !important;
+.fixed-header h1 {
+    font-size: 28px !important; /* Slightly smaller for better fit */
+    color: #29B5E8;
+    margin: 0 0 2px 0 !important; /* Reduced margin */
+    font-weight: 600 !important;
 }
+.fixed-header p {
+    font-size: 16px !important; /* Slightly smaller for better fit */
+    color: #333;
+    margin: 0 !important;
+    font-weight: 400 !important;
+}
+.fixed-header a {
+    pointer-events: none !important;
+    text-decoration: none !important;
+    color: inherit !important;
+    cursor: default !important;
+}
+
+/* Dilytics logo */
 .dilytics-logo {
     position: fixed;
     top: 10px;
@@ -146,35 +157,77 @@ st.markdown("""
     width: 150px;
     height: auto;
 }
-.fixed-header {
-    position: fixed;
-    top: 0;
-    left: 20px;
-    right: 0;
-    z-index: 999;
-    background-color: #ffffff;
-    padding: 10px;
-    text-align: center;
-    pointer-events: none;
+
+/* Chat messages */
+[data-testid="stChatMessage"] {
+    opacity: 1 !important;
+    background-color: transparent !important;
+    white-space: pre-wrap !important;
+    word-wrap: break-word !important;
+    overflow: hidden !important;
+    margin-bottom: 10px !important; /* Reduced from 20px */
+    padding: 8px !important; /* Reduced padding for tighter spacing */
+    border-radius: 8px !important;
+    text-align: left !important;
+    font-size: 15px !important; /* Consistent font size */
+    line-height: 1.5 !important; /* Improved readability */
+    width: 100% !important;
 }
-.fixed-header a {
-    pointer-events: none !important;
-    text-decoration: none !important;
-    color: inherit !important;
-    cursor: default !important;
+[data-testid="stChatMessageContent"] {
+    white-space: pre-wrap !important;
+    word-wrap: break-word !important;
+    overflow: hidden !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    text-align: left !important;
+    padding-left: 0 !important;
+    margin-left: 0 !important;
+    font-size: 15px !important; /* Consistent font size */
+    line-height: 1.5 !important;
 }
-.stApp {
-    padding-top: 100px;
+
+/* Dataframes */
+[data-testid="stDataFrame"] {
+    text-align: left !important;
+    width: 100% !important;
+    margin: 0 auto !important;
+    font-size: 14px !important; /* Slightly smaller for dataframes */
+    line-height: 1.4 !important;
+}
+
+/* Markdown elements */
+[data-testid="stMarkdown"] {
+    text-align: left !important;
+    width: 100% !important;
+    padding: 3px 0 !important; /* Reduced padding */
+    font-size: 15px !important; /* Consistent font size */
+    line-height: 1.5 !important;
+}
+[data-testid="stMarkdown"] h1, [data-testid="stMarkdown"] h2, [data-testid="stMarkdown"] h3 {
+    font-weight: 600 !important;
+    margin: 5px 0 !important; /* Reduced margin for tighter spacing */
+}
+
+/* Hide copy buttons */
+.copy-button, [data-testid="copy-button"], [title="Copy to clipboard"], [data-testid="stTextArea"] {
+    display: none !important;
+}
+
+/* Sidebar styling */
+[data-testid="stSidebar"] {
+    padding: 10px !important; /* Reduced padding */
 }
 [data-testid="stSidebar"] [data-testid="stButton"] > button {
     background-color: #29B5E8 !important;
     color: white !important;
-    font-weight: bold !important;
+    font-weight: 600 !important;
     width: 100% !important;
     border-radius: 0px !important;
-    margin: 0 !important;
+    margin: 2px 0 !important; /* Reduced margin between buttons */
     border: none !important;
     padding: 0.5rem 1rem !important;
+    font-size: 14px !important;
+    line-height: 1.4 !important;
 }
 [data-testid="stSidebar"] [data-testid="stButton"][aria-label="Clear conversation"] > button,
 [data-testid="stSidebar"] [data-testid="stButton"][aria-label="About"] > button,
@@ -183,8 +236,17 @@ st.markdown("""
 [data-testid="stSidebar"] [data-testid="stButton"][aria-label="Sample Questions"] > button {
     background-color: #28A745 !important;
     color: white !important;
-    font-weight: normal !important;
+    font-weight: 500 !important;
     border: 1px solid #28A745 !important;
+    font-size: 14px !important;
+    line-height: 1.4 !important;
+}
+[data-testid="stSidebar"] [data-testid="stExpander"] {
+    margin: 5px 0 !important; /* Reduced margin */
+}
+[data-testid="stSidebar"] [data-testid="stMarkdown"] {
+    font-size: 14px !important;
+    line-height: 1.4 !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -261,7 +323,7 @@ def query_cortex_search_service(query):
         search_col = service_metadata[0]["search_column"]
         context_str = ""
         for i, r in enumerate(results):
-            context_str += f"Context document {i+1}: {r[search_col]} \n" + "\n"
+            context_str += f"Context document {i+1}: {r[search_col]} \n"
         return context_str
     except Exception as e:
         st.error(f"❌ Error querying Cortex Search service: {str(e)}")
@@ -534,18 +596,18 @@ else:
             else:
                 return [
                     "What is the total award budget posted by date?",
-                    "Which awards have the highest encumbrances ?",
-                    "What is the total amount of award encumbrances approved ?",
+                    "Which awards have the highest encumbrances?",
+                    "What is the total amount of award encumbrances approved?",
                     "What is the date-wise breakdown of award budgets?",
-                    "Which awards have pending encumbrances ?"
+                    "Which awards have pending encumbrances?"
                 ]
         except Exception as e:
             return [
                 "What is the total award budget posted by date?",
-                "Which awards have the highest encumbrances ?",
+                "Which awards have the highest encumbrances?",
                 "What is the total amount of award encumbrances approved?",
                 "What is the date-wise breakdown of award budgets?",
-                "Which awards have pending encumbrances ?"
+                "Which awards have pending encumbrances?"
             ]
 
     def display_chart_tab(df: pd.DataFrame, prefix: str = "chart", query: str = ""):
@@ -665,10 +727,10 @@ else:
                 "What is the total award encumbrance posted for these awards?",
                 "What is the total amount of award encumbrances approved?",
                 "What is the total actual award posted for these awards?",
-                "what is the award budget posted?",
-                "what is this document about",
+                "What is the award budget posted?",
+                "What is this document about?",
                 "Subject areas",
-                "explain five layers in High level Architecture"
+                "Explain five layers in High level Architecture"
             ]
             for sample in sample_questions:
                 if st.button(sample, key=f"sidebar_{sample}"):
@@ -723,12 +785,8 @@ else:
     st.markdown(
     """
     <div class="fixed-header">
-        <h1 style='font-size: 30px; color: #29B5E8; margin-bottom: 4px;'>
-            Cortex AI – Grants Management Assistant by DiLytics
-        </h1>
-        <p style='font-size: 18px; color: #333;'>
-            <strong>Welcome to Cortex AI. I am here to help with DiLytics Grants Management Insights Solutions.</strong>
-        </p>
+        <h1>Cortex AI – Grants Management Assistant by DiLytics</h1>
+        <p><strong>Welcome to Cortex AI. I am here to help with DiLytics Grants Management Insights Solutions.</strong></p>
     </div>
     """,
     unsafe_allow_html=True
@@ -808,36 +866,34 @@ else:
 
                 if is_greeting:
                     response_content = (
-                        "Hello! How can I assist you with Grants Management today?\n\n"
+                        "Hello! How can I assist you with Grants Management today?\n"
                         "Here are some questions you can try:\n"
                         "1. What is the total award budget posted by date?\n"
-                        "2. Which awards have the highest encumbrances approved ?\n"
-                        "3. What is the total amount of award encumbrances ?\n"
+                        "2. Which awards have the highest encumbrances?\n"
+                        "3. What is the total amount of award encumbrances approved?\n"
                         "4. What is the date-wise breakdown of award budgets?\n"
-                        "5. Which awards have pending encumbrances ?\n"
+                        "5. Which awards have pending encumbrances?\n"
                     )
                     response_placeholder.markdown(response_content, unsafe_allow_html=True)
                     assistant_response["content"] = response_content
                     suggestions = [
                         "What is the total award budget posted by date?",
-                        "Which awards have the highest encumbrances ?",
-                        "What is the total amount of award encumbrances approved ?",
+                        "Which awards have the highest encumbrances?",
+                        "What is the total amount of award encumbrances approved?",
                         "What is the date-wise breakdown of award budgets?",
-                        "Which awards have pending encumbrances ?"
+                        "Which awards have pending encumbrances?"
                     ]
                     st.session_state.last_suggestions = suggestions
                     st.session_state.messages.append({"role": "assistant", "content": response_content})
 
                 elif is_suggestion:
-                    response_content = (
-                        "Here are some questions you can try:\n"
-                    )
+                    response_content = "Here are some questions you can try:\n"
                     suggestions = [
                         "What is the total award budget posted by date?",
-                        "Which awards have the highest encumbrances ?",
-                        "What is the total amount of award encumbrances approved ?",
+                        "Which awards have the highest encumbrances?",
+                        "What is the total amount of award encumbrances approved?",
                         "What is the date-wise breakdown of award budgets?",
-                        "Which awards have pending encumbrances ?"
+                        "Which awards have pending encumbrances?"
                     ]
                     for i, suggestion in enumerate(suggestions, 1):
                         response_content += f"{i}. {suggestion}\n"
@@ -931,7 +987,7 @@ else:
 
                 if failed_response:
                     suggestions = suggest_sample_questions(combined_query)
-                    response_content = "I am not sure about your question. Here are some questions you can ask me:\n\n"
+                    response_content = "I am not sure about your question. Here are some questions you can ask me:\n"
                     for i, suggestion in enumerate(suggestions, 1):
                         response_content += f"{i}. {suggestion}\n"
                     response_placeholder.markdown(response_content, unsafe_allow_html=True)
