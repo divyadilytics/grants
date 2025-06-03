@@ -356,12 +356,12 @@ if not st.session_state.authenticated:
             snowpark_session = Session.builder.configs({"connection": conn}).create()
             st.session_state.snowpark_session = snowpark_session
             with conn.cursor() as cur:
-                cur.execute(f"USE DATABASE {DATABASE}")
-                cur.execute(f"USE SCHEMA {SCHEMA}")
+                cur.execute("USE DATABASE AI")
+                cur.execute("USE SCHEMA DWH_MART")
                 cur.execute("ALTER SESSION SET TIMEZONE = 'UTC'")
                 cur.execute("ALTER SESSION SET QUOTED_IDENTIFIERS_IGNORE_CASE = TRUE")
             st.session_state.authenticated = True
-            st.success("Authentication successful! Redirecting...")
+            st.success("Authentication successful!")
             st.rerun()
         except Exception as e:
             st.error(f"Authentication failed: {e}")
@@ -377,20 +377,25 @@ else:
             data = df.collect()
             if not data:
                 return None
-            columns = df.schema.names
+            columns = df.columns
             result_df = pd.DataFrame(data, columns=columns)
-            # Ensure AWARD_NUMBER is treated as an integer without 'k' or decimal formatting
-            if "AWARD_NUMBER" in result_df.columns:
-                result_df["AWARD_NUMBER"] = result_df["AWARD_NUMBER"].astype(int)
+            # Debug: Print column names to identify the correct award number column
+            if st.session_state.debug_mode:
+                st.write("Debug - DataFrame Columns:", result_df.columns.tolist())
+            # Ensure award number columns are treated as integers
+            award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO"]
+            for col in award_number_candidates:
+                if col in result_df.columns:
+                    result_df[col] = result_df[col].astype('Int64').fillna(0).astype(int)
             return result_df
         except Exception as e:
-            st.error(f"❌ SQL Execution Error: {str(e)}")
+            st.error(f"Error executing SQL query: {str(e)}")
             return None
 
     def is_structured_query(query: str):
         structured_patterns = [
-            r'\b(count|number|where|group by|order by|sum|avg|max|min|total|how many|which|show|list)\b',
-            r'\b(grant|award|funding|recipient|application|status|amount|budget|encumbrance|posted|approved|task|actual)\b'
+            r'\b(count|number|amount|where|group by|order by|sum|avg|max|min|total|how many|which|show|list)\b',
+            r'\b(grant|award|funding|recipient|application|status|budget|encumbrance|posted|approved|task|actual)\b'
         ]
         return any(re.search(pattern, query.lower()) for pattern in structured_patterns)
 
@@ -404,13 +409,13 @@ else:
 
     def is_question_suggestion_query(query: str):
         suggestion_patterns = [
-            r'\b(what|which|how)\b.*\b(questions|queries)\b.*\b(ask|can i ask)\b',
-            r'\b(give me|show me|list)\b.*\b(questions|examples)\b'
+            r'\b(what|which|how)\b.*\b(questions|queries)\b.*\s+\b(ask|can i ask)\b',
+            r'\b(give me|show me|list)\b.*\s+\b(questions|examples)\b'
         ]
         return any(re.search(pattern, query.lower()) for pattern in suggestion_patterns)
 
     def is_greeting_query(query: str):
-        greeting_patterns = [r'^\b(hello|hi|hey|greet)\b$']
+        greeting_patterns = [r'^\s*(hello|hi|hey|greet)\s*$']
         return any(re.search(pattern, query.lower()) for pattern in greeting_patterns)
 
     def complete(model, prompt):
@@ -420,7 +425,7 @@ else:
             result = session.sql(query).collect()
             return result[0]["RESPONSE"]
         except Exception as e:
-            st.error(f"❌ COMPLETE Function Error: {str(e)}")
+            st.error(f"Error in COMPLETE function: {str(e)}")
             return None
 
     def summarize(text):
@@ -430,7 +435,7 @@ else:
             result = session.sql(query).collect()
             return result[0]["SUMMARY"]
         except Exception as e:
-            st.error(f"❌ SUMMARIZE Function Error: {str(e)}")
+            st.error(f"Error in SUMMARIZE function: {str(e)}")
             return None
 
     def parse_sse_response(response_text: str) -> List[Dict]:
@@ -449,7 +454,7 @@ else:
                         events.append(current_event)
                         current_event = {}
                     except json.JSONDecodeError as e:
-                        st.error(f"❌ Failed to parse SSE data: {str(e)}")
+                        st.error(f"Failed to parse SSE data: {str(e)}")
         return events
 
     def process_sse_response(response, is_structured):
@@ -498,13 +503,13 @@ else:
             )
             if resp.status_code < 400:
                 if not resp.text.strip():
-                    st.error("❌ API returned an empty response.")
+                    st.error("API returned an empty response.")
                     return None
                 return parse_sse_response(resp.text)
             else:
                 raise Exception(f"Failed request with status {resp.status_code}: {resp.text}")
         except Exception as e:
-            st.error(f"❌ API Request Error: {str(e)}")
+            st.error(f"API Request Error: {str(e)}")
             return None
 
     def summarize_unstructured_answer(answer):
@@ -528,19 +533,19 @@ else:
                 return questions[:5]
             else:
                 return [
-                    "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
-                    "What is the total award encumbrance posted for these awards?",
-                    "What is the average grant amount by category?",
-                    "Which grants are expiring soon?",
-                    "What is the total funding awarded by year?"
+                    "What is the total award budget posted by date?",
+                    "Which awards have the highest encumbrances in the current quarter?",
+                    "What is the total amount of award encumbrances approved this month?",
+                    "What is the date-wise breakdown of award budgets?",
+                    "Which awards have pending encumbrances for more than two weeks?"
                 ]
         except Exception as e:
             return [
-                "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
-                "What is the total award encumbrance posted for these awards?",
-                "What is the average grant amount by category?",
-                "Which grants are expiring soon?",
-                "What is the total funding awarded by year?"
+                "What is the total award budget posted by date?",
+                "Which awards have the highest encumbrances in the current quarter?",
+                "What is the total amount of award encumbrances approved this month?",
+                "What is the date-wise breakdown of award budgets?",
+                "Which awards have pending encumbrances for more than two weeks?"
             ]
 
     def display_chart_tab(df: pd.DataFrame, prefix: str = "chart", query: str = ""):
@@ -598,7 +603,7 @@ else:
                     fig = px.histogram(df, x=x_col, y=y_col, title=chart_type)
                     st.plotly_chart(fig, key=f"{prefix}_hist")
         except Exception as e:
-            st.error(f"❌ Error generating chart: {str(e)}")
+            st.error(f"Error generating chart: {str(e)}")
 
     def toggle_about():
         st.session_state.show_about = not st.session_state.show_about
@@ -651,19 +656,11 @@ else:
         if st.session_state.get("show_sample_questions", False):
             st.markdown("### Sample Questions")
             sample_questions = [
-                "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
-                "Give me date wise award breakdowns",
-                "Give me award breakdowns",
-                "Give me date wise award budget, actual award posted, award encumbrance posted, award encumbrance approved",
-                "What is the task actual posted by award name?",
-                "What is the award budget posted by date for these awards?",
-                "What is the total award encumbrance posted for these awards?",
-                "What is the total amount of award encumbrances approved?",
-                "What is the total actual award posted for these awards?",
-                "What is the award budget posted?",
-                "What is this document about",
-                "Subject areas",
-                "Explain five layers in High level Architecture"
+                "What is the total award budget posted by date?",
+                "Which awards have the highest encumbrances in the current quarter?",
+                "What is the total amount of award encumbrances approved this month?",
+                "What is the date-wise breakdown of award budgets?",
+                "Which awards have pending encumbrances for more than two weeks?"
             ]
             for sample in sample_questions:
                 if st.button(sample, key=f"sidebar_{sample}"):
@@ -676,7 +673,7 @@ else:
             application_details = st.text_area("Application Details", key="application_details")
             if st.button("Submit Application", key="submit_grant_application"):
                 if not grant_id or not applicant_name or not application_details:
-                    st.error("❌ Please fill in all fields to submit a grant application.")
+                    st.error("Please fill in all fields to submit a grant application.")
                 else:
                     success, message = submit_grant_application(grant_id, applicant_name, application_details)
                     if success:
@@ -745,10 +742,11 @@ else:
                 with st.expander("View SQL Query", expanded=False):
                     st.code(message["sql"], language="sql")
                 st.markdown(f"**Query Results ({len(message['results'])} rows):**")
-                # Format AWARD_NUMBER column in the dataframe display
                 df_to_display = message["results"].copy()
-                if "AWARD_NUMBER" in df_to_display.columns:
-                    df_to_display["AWARD_NUMBER"] = df_to_display["AWARD_NUMBER"].astype(int)
+                award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO"]
+                for col in award_number_candidates:
+                    if col in df_to_display.columns:
+                        df_to_display[col] = df_to_display[col].astype('Int64').fillna(0).astype(int)
                 st.dataframe(df_to_display)
                 if not df_to_display.empty and len(df_to_display.columns) >= 2:
                     st.markdown("**📈 Visualization:**")
@@ -800,17 +798,22 @@ else:
                 response_content = ""
                 failed_response = False
 
-                if is_greeting or is_suggestion:
+                if is_greeting:
+                    response_content = "Hello! How can I assist you with Grants Management today?"
+                    response_placeholder.markdown(response_content, unsafe_allow_html=True)
+                    assistant_response["content"] = response_content
+                    st.session_state.messages.append({"role": "assistant", "content": response_content})
+
+                elif is_suggestion:
                     response_content = (
-                        "Hello! Welcome to the Grants Management AI Assistant!\n"
                         "Here are some questions you can try:\n"
                     )
                     suggestions = [
-                        "What is the posted budget for awards 41001, 41002, 41003, 41005, 41007, and 41018 by date?",
-                        "What is the total award encumbrance posted for these awards?",
-                        "What is the average grant amount by category?",
-                        "Which grants are expiring soon?",
-                        "What is the total funding awarded by year?"
+                        "What is the total award budget posted by date?",
+                        "Which awards have the highest encumbrances in the current quarter?",
+                        "What is the total amount of award encumbrances approved this month?",
+                        "What is the date-wise breakdown of award budgets?",
+                        "Which awards have pending encumbrances for more than two weeks?"
                     ]
                     for i, suggestion in enumerate(suggestions, 1):
                         response_content += f"{i}. {suggestion}\n"
@@ -822,7 +825,7 @@ else:
                 elif is_complete:
                     response = create_prompt(combined_query)
                     if response:
-                        response_content = f"**✍️ Generated Response:**\n{response}"
+                        response_content = f"**Generated Response:**\n{response}"
                         response_placeholder.markdown(response_content, unsafe_allow_html=True)
                         assistant_response["content"] = response_content
                         st.session_state.messages.append({"role": "assistant", "content": response_content})
@@ -850,15 +853,16 @@ else:
                             summary = complete(st.session_state.model_name, prompt)
                             if not summary:
                                 summary = "Unable to generate a summary."
-                            response_content = f"**✍️ Generated Response:**\n{summary}"
+                            response_content = f"**Generated Response:**\n{summary}"
                             response_placeholder.markdown(response_content, unsafe_allow_html=True)
                             with st.expander("View SQL Query", expanded=False):
                                 st.code(sql, language="sql")
                             st.markdown(f"**Query Results ({len(results)} rows):**")
-                            # Format AWARD_NUMBER column in the dataframe display
                             df_to_display = results.copy()
-                            if "AWARD_NUMBER" in df_to_display.columns:
-                                df_to_display["AWARD_NUMBER"] = df_to_display["AWARD_NUMBER"].astype(int)
+                            award_number_candidates = ["AWARD_NUMBER", "AWARD_ID", "GRANT_ID", "AWARD_NO"]
+                            for col in award_number_candidates:
+                                if col in df_to_display.columns:
+                                    df_to_display[col] = df_to_display[col].astype('Int64').fillna(0).astype(int)
                             st.dataframe(df_to_display)
                             if len(df_to_display.columns) >= 2:
                                 st.markdown("**📈 Visualization:**")
@@ -892,9 +896,9 @@ else:
                         raw_result = search_results[0]
                         summary = create_prompt(combined_query)
                         if summary:
-                            response_content = f"**Here is the Answer:**\n{summary}"
+                            response_content = f"**Answer:**\n{summary}"
                         else:
-                            response_content = f"**🔍 Key Information:**\n{summarize_unstructured_answer(raw_result)}"
+                            response_content = f"**Key Information:**\n{summarize_unstructured_answer(raw_result)}"
                         response_placeholder.markdown(response_content, unsafe_allow_html=True)
                         assistant_response["content"] = response_content
                         st.session_state.messages.append({"role": "assistant", "content": response_content})
