@@ -744,7 +744,7 @@ else:
                 response_content = "Hello! Here are some questions you can ask me:\n\n"
                 for i, q in enumerate(sample_questions[:5], 1):
                     response_content += f"{i}. {q}\n"
-                response_content += "\nFeel free to ask any of these or come up with your own related to PBCS data!"
+                response_content += "\nFeel free to ask any of these or come up with your own related to GRANTS data!"
                 with response_placeholder:
                     with st.chat_message("assistant"):
                         st.markdown(f'<div class="assistant-response">{response_content}</div>', unsafe_allow_html=True)
